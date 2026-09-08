@@ -14,17 +14,17 @@ The commit above is the reproducible reference baseline for compatibility review
 
 ## Planned selective migration
 
-No Alias source code has been copied into BizInsight Agent at project initialization. The following areas are candidates for review; the task 2 compatibility audit will record whether each area is migrated, rewritten, or removed.
+No Alias source code was copied into BizInsight Agent at project initialization. Task 2 completed the compatibility audit; detailed evidence is recorded in `docs/alias-compatibility-audit.md`.
 
-| Alias area | BizInsight intention |
+| Alias area | Audited treatment |
 |---|---|
-| `src/alias/agent/agents/_meta_planner.py` | Adapt planning responsibilities into business-task planning and Worker dispatch |
-| `src/alias/agent/agents/_react_worker.py` | Reuse the ReAct Worker design ideas in a restricted business Worker base |
-| `src/alias/agent/agents/_data_science_agent.py` | Extract data-source understanding and deterministic tool-use patterns |
-| `src/alias/agent/agents/_deep_research_agent_v2.py` | Extract retrieval, evidence synthesis, and citation patterns |
-| Alias data-source utilities | Redesign behind `BusinessDataProvider` |
-| `src/alias/agent/tools/` | Keep the Toolkit organization idea while replacing tools with domain-specific tools |
-| Runtime runner | Reintegrate against AgentScope 2.0.7 after compatibility review |
+| `src/alias/agent/agents/_meta_planner.py` | Rewrite as bounded business planning and Worker dispatch |
+| `src/alias/agent/agents/_react_worker.py` | Rewrite around AgentScope 2.0.7 `Agent` and `ReActConfig` |
+| `src/alias/agent/agents/_data_science_agent.py` | Delete the general agent; rewrite selected deterministic analysis ideas |
+| `src/alias/agent/agents/_deep_research_agent_v2.py` | Delete the generic research tree; rewrite a narrow evidence flow |
+| Alias data-source utilities | Rewrite behind `BusinessDataProvider` |
+| `src/alias/agent/tools/` | Migrate organization only; replace implementations with allowlisted domain tools |
+| Runtime runner | Delete Alias runner; integrate directly with the 2.0.7 service API in task 12 |
 
 ## Explicitly excluded Alias scope
 
