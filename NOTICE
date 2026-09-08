@@ -1,0 +1,11 @@
+BizInsight Agent
+
+This product includes material adapted from AgentScope Samples / Alias,
+Copyright 2025 Alibaba, licensed under the Apache License, Version 2.0.
+
+Source: https://github.com/agentscope-ai/agentscope-samples
+Pinned revision: c7f3174cbbd32a96c796571d0fe930ac80ddd523
+
+The BizInsight-specific domain model, synthetic data, business tools,
+evidence contracts, review workflow, reports, and evaluations are original
+project work unless a source file states otherwise.

@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bizinsight-agent"
+version = "0.1.0"
+description = "Evidence-grounded business anomaly diagnosis agent for B2B technology companies"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { file = "LICENSE" }
+dependencies = [
+    "agentscope==2.0.7",
+    "jinja2>=3.1,<4",
+    "matplotlib>=3.9,<4",
+    "pandas>=2.2,<3",
+    "pydantic>=2.10,<3",
+    "pydantic-settings>=2.7,<3",
+    "pyyaml>=6.0,<7",
+]
+
+[project.optional-dependencies]
+research = ["tavily-python>=0.7,<1"]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.25,<1",
+    "ruff>=0.11,<1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "smoke: minimal integration smoke tests",
+    "online: tests that call external services and require credentials",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

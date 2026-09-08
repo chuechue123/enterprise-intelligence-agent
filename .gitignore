@@ -1,0 +1,41 @@
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Packaging output
+build/
+dist/
+*.egg-info/
+
+# Generated business data and indexes
+data/raw/*.csv
+data/database/
+data/knowledge/index/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+# Runtime and evaluation output
+outputs/
+evaluations/results/
+*.log
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
