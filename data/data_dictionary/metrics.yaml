@@ -1,0 +1,39 @@
+schema_version: 1
+currency: CNY
+period_convention: calendar_quarter
+metrics:
+  revenue:
+    name_zh: 营业收入
+    source_table: contracts
+    formula: SUM(recognized_revenue)
+    period_field: recognition_quarter
+    unit: CNY
+    notes: 仅统计在目标季度已满足收入确认条件的合同金额。
+  gross_margin:
+    name_zh: 综合毛利率
+    source_table: contracts
+    formula: (SUM(recognized_revenue) - SUM(recognized_cost)) / SUM(recognized_revenue)
+    period_field: recognition_quarter
+    unit: ratio
+    notes: 分母为目标季度确认收入；收入为零时不计算。
+  renewal_rate:
+    name_zh: 到期客户续费率
+    source_table: subscriptions
+    formula: COUNT(renewal_status = 'renewed') / COUNT(due_for_renewal = true)
+    period_field: quarter
+    unit: ratio
+    notes: 分母只包含目标季度到期的客户订阅记录。
+  on_time_acceptance_rate:
+    name_zh: 项目按期验收率
+    source_table: projects
+    formula: COUNT(on_time = true) / COUNT(project_id)
+    period_field: planned_acceptance_quarter
+    unit: ratio
+    notes: 按计划验收季度归属；截止日仍未验收的项目计为未按期。
+  win_rate:
+    name_zh: 商机赢单率
+    source_table: opportunities
+    formula: COUNT(outcome = 'won') / COUNT(opportunity_id)
+    period_field: close_quarter
+    unit: ratio
+    notes: 分母为目标季度已经关闭的商机。

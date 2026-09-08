@@ -1,0 +1,113 @@
+schema_version: 1
+coverage:
+  start_date: 2025-07-01
+  end_date: 2026-06-30
+tables:
+  customers:
+    description: 虚构企业客户主数据。
+    primary_key: customer_id
+    columns:
+      customer_id: 稳定客户编号
+      customer_name: 完全虚构的客户名称
+      region: 华东、华南、华北、西南或华中
+      industry: 客户所属行业
+      size_segment: SMB、Mid-Market 或 Enterprise
+      customer_since: 客户关系开始日期
+  opportunities:
+    description: 已关闭销售商机及输赢结果。
+    primary_key: opportunity_id
+    foreign_keys:
+      customer_id: customers.customer_id
+    columns:
+      created_date: 商机创建日期
+      close_date: 商机关闭日期
+      close_quarter: 关闭自然季度
+      product: 意向产品
+      amount: 预计商机金额
+      stage: closed_won 或 closed_lost
+      outcome: won 或 lost
+      loss_reason: 输单原因；赢单时为空
+  contracts:
+    description: 合同、收入确认和直接成本记录。
+    primary_key: contract_id
+    foreign_keys:
+      customer_id: customers.customer_id
+      opportunity_id: opportunities.opportunity_id
+    columns:
+      signed_date: 签约日期
+      contract_start_date: 合同开始日期
+      contract_end_date: 合同结束日期
+      product: 合同产品
+      recognition_quarter: 收入确认季度；deferred 表示尚未确认
+      recognition_date: 实际收入确认日期
+      recognized_revenue: 已确认收入
+      recognized_cost: 对应直接成本
+      contract_value: 合同金额
+  subscriptions:
+    description: 客户订阅月度状态和续费事件。
+    primary_key: subscription_id
+    foreign_keys:
+      contract_id: contracts.contract_id
+      customer_id: customers.customer_id
+    columns:
+      month: 月份 YYYY-MM
+      quarter: 自然季度
+      status: 订阅状态
+      due_for_renewal: 当月是否到期
+      renewal_status: not_due、renewed 或 churned
+      mrr: 月度经常性收入
+  product_usage:
+    description: 客户产品使用月度聚合数据。
+    primary_key: usage_id
+    foreign_keys:
+      customer_id: customers.customer_id
+      contract_id: contracts.contract_id
+    columns:
+      month: 月份 YYYY-MM
+      quarter: 自然季度
+      product_version: 使用的主要产品版本
+      active_users: 月活跃用户数
+      login_count: 登录次数
+      workflow_runs: 工作流运行次数
+      core_feature_uses: 核心功能使用次数
+  projects:
+    description: 合同实施和验收项目。
+    primary_key: project_id
+    foreign_keys:
+      contract_id: contracts.contract_id
+      customer_id: customers.customer_id
+    columns:
+      planned_acceptance_date: 计划验收日期
+      actual_acceptance_date: 实际验收日期；未验收时为空
+      planned_acceptance_quarter: 计划验收自然季度
+      on_time: 是否按期验收
+      planned_hours: 计划工时
+      actual_hours: 实际工时
+      customization_level: low、medium 或 high
+      outsourcing_cost: 外包成本
+      deferred_revenue: 因未验收而推迟确认的收入
+  support_tickets:
+    description: 客服工单及服务质量数据。
+    primary_key: ticket_id
+    foreign_keys:
+      customer_id: customers.customer_id
+      contract_id: contracts.contract_id
+    columns:
+      created_date: 工单创建日期
+      quarter: 创建自然季度
+      category: 工单类别
+      severity: low、medium、high 或 critical
+      first_response_hours: 首次响应小时数
+      resolution_hours: 解决小时数
+      satisfaction_score: 1 至 5 分满意度
+      product_version: 涉及的产品版本
+  payments:
+    description: 合同回款记录。
+    primary_key: payment_id
+    foreign_keys:
+      contract_id: contracts.contract_id
+      customer_id: customers.customer_id
+    columns:
+      payment_date: 回款或应回款日期
+      amount: 回款金额
+      status: paid 或 overdue

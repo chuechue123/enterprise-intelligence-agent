@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "seed": 20260908,
+  "csv_directory": "data/raw",
+  "sqlite_database": "data/database/bizinsight.sqlite",
+  "data_dictionary": "data/data_dictionary"
+}

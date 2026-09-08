@@ -1,0 +1,140 @@
+{
+  "record_counts": {
+    "customers": 240,
+    "opportunities": 800,
+    "contracts": 350,
+    "subscriptions": 2500,
+    "product_usage": 2880,
+    "projects": 120,
+    "support_tickets": 1800,
+    "payments": 600
+  },
+  "missing_rates": {
+    "customers": {
+      "customer_id": 0.0,
+      "customer_name": 0.0,
+      "region": 0.0,
+      "industry": 0.0,
+      "size_segment": 0.0,
+      "customer_since": 0.0
+    },
+    "opportunities": {
+      "opportunity_id": 0.0,
+      "customer_id": 0.0,
+      "created_date": 0.0,
+      "close_date": 0.0,
+      "close_quarter": 0.0,
+      "region": 0.0,
+      "size_segment": 0.0,
+      "product": 0.0,
+      "amount": 0.0,
+      "stage": 0.0,
+      "outcome": 0.0,
+      "loss_reason": 0.3575
+    },
+    "contracts": {
+      "contract_id": 0.0,
+      "customer_id": 0.0,
+      "opportunity_id": 0.342857,
+      "signed_date": 0.0,
+      "contract_start_date": 0.0,
+      "contract_end_date": 0.0,
+      "product": 0.0,
+      "recognition_quarter": 0.0,
+      "recognition_date": 0.011429,
+      "recognized_revenue": 0.0,
+      "recognized_cost": 0.0,
+      "contract_value": 0.0
+    },
+    "subscriptions": {
+      "subscription_id": 0.0,
+      "contract_id": 0.0,
+      "customer_id": 0.0,
+      "month": 0.0,
+      "quarter": 0.0,
+      "status": 0.0,
+      "due_for_renewal": 0.0,
+      "renewal_status": 0.0,
+      "mrr": 0.0
+    },
+    "product_usage": {
+      "usage_id": 0.0,
+      "customer_id": 0.0,
+      "contract_id": 0.0,
+      "month": 0.0,
+      "quarter": 0.0,
+      "product_version": 0.0,
+      "active_users": 0.0,
+      "login_count": 0.0,
+      "workflow_runs": 0.0,
+      "core_feature_uses": 0.0
+    },
+    "projects": {
+      "project_id": 0.0,
+      "contract_id": 0.0,
+      "customer_id": 0.0,
+      "planned_acceptance_date": 0.0,
+      "actual_acceptance_date": 0.033333,
+      "planned_acceptance_quarter": 0.0,
+      "on_time": 0.0,
+      "planned_hours": 0.0,
+      "actual_hours": 0.0,
+      "customization_level": 0.0,
+      "outsourcing_cost": 0.0,
+      "deferred_revenue": 0.0
+    },
+    "support_tickets": {
+      "ticket_id": 0.0,
+      "customer_id": 0.0,
+      "contract_id": 0.0,
+      "created_date": 0.0,
+      "quarter": 0.0,
+      "category": 0.0,
+      "severity": 0.0,
+      "first_response_hours": 0.0,
+      "resolution_hours": 0.0,
+      "satisfaction_score": 0.0,
+      "product_version": 0.0
+    },
+    "payments": {
+      "payment_id": 0.0,
+      "contract_id": 0.0,
+      "customer_id": 0.0,
+      "payment_date": 0.0,
+      "amount": 0.0,
+      "status": 0.0
+    }
+  },
+  "orphan_counts": {
+    "opportunities.customer_id": 0,
+    "contracts.customer_id": 0,
+    "contracts.opportunity_id": 0,
+    "subscriptions.contract_id": 0,
+    "subscriptions.customer_id": 0,
+    "product_usage.contract_id": 0,
+    "product_usage.customer_id": 0,
+    "projects.contract_id": 0,
+    "projects.customer_id": 0,
+    "support_tickets.contract_id": 0,
+    "support_tickets.customer_id": 0,
+    "payments.contract_id": 0,
+    "payments.customer_id": 0
+  },
+  "foreign_key_integrity": 1.0,
+  "core_metrics": {
+    "2026-Q1": {
+      "revenue": 18700000,
+      "gross_margin": 0.468,
+      "renewal_rate": 0.846154,
+      "on_time_acceptance_rate": 0.861111,
+      "win_rate": 0.31
+    },
+    "2026-Q2": {
+      "revenue": 16400000,
+      "gross_margin": 0.389,
+      "renewal_rate": 0.728395,
+      "on_time_acceptance_rate": 0.638889,
+      "win_rate": 0.22
+    }
+  }
+}
