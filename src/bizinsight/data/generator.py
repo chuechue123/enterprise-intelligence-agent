@@ -871,6 +871,7 @@ def write_dataset(
                 "csv_directory": "data/raw",
                 "sqlite_database": "data/database/bizinsight.sqlite",
                 "data_dictionary": "data/data_dictionary",
+                "knowledge_index": "data/knowledge/index.json",
             },
             ensure_ascii=False,
             indent=2,

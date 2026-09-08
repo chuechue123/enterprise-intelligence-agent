@@ -89,4 +89,5 @@ def test_writer_outputs_csv_sqlite_quality_and_separated_ground_truth(
         paths.runtime_manifest_path.read_text(encoding="utf-8"),
     )
     assert "ground_truth" not in json.dumps(runtime_manifest)
+    assert runtime_manifest["knowledge_index"] == "data/knowledge/index.json"
     assert paths.ground_truth_path not in paths.runtime_inputs
