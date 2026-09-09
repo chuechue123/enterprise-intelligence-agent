@@ -174,8 +174,7 @@ def validate_readonly_sql(sql: str) -> str:
         masked = masked[: semicolons[0]].rstrip()
 
     keywords = [
-        match.group(0).upper()
-        for match in FIRST_KEYWORD_PATTERN.finditer(masked)
+        match.group(0).upper() for match in FIRST_KEYWORD_PATTERN.finditer(masked)
     ]
     if not keywords or keywords[0] not in {"SELECT", "WITH"}:
         raise UnsafeQueryError("only SELECT or read-only WITH statements are allowed")

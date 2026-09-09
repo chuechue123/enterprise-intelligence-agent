@@ -116,11 +116,7 @@ def _allocate_total(total: int, weights: np.ndarray) -> np.ndarray:
 
 def _generate_customers(rng: np.random.Generator) -> pd.DataFrame:
     regions = np.array(
-        ["华东"] * 60
-        + ["华南"] * 45
-        + ["华北"] * 45
-        + ["西南"] * 45
-        + ["华中"] * 45,
+        ["华东"] * 60 + ["华南"] * 45 + ["华北"] * 45 + ["西南"] * 45 + ["华中"] * 45,
         dtype=object,
     )
     sizes = np.array(
@@ -169,8 +165,7 @@ def _generate_opportunities(
     for quarter, (start, end) in QUARTERS.items():
         selected_segment = [east_smb[i % len(east_smb)] for i in range(50)]
         selected_other = [
-            non_east_smb[int(rng.integers(0, len(non_east_smb)))]
-            for _ in range(150)
+            non_east_smb[int(rng.integers(0, len(non_east_smb)))] for _ in range(150)
         ]
         selected_customers = selected_segment + selected_other
         rng.shuffle(selected_customers)
@@ -262,9 +257,7 @@ def _generate_contracts(
                 "opportunity_id": opportunity_id,
                 "signed_date": signed_date.isoformat(),
                 "contract_start_date": signed_date.isoformat(),
-                "contract_end_date": (
-                    signed_date + timedelta(days=364)
-                ).isoformat(),
+                "contract_end_date": (signed_date + timedelta(days=364)).isoformat(),
                 "product": rng.choice(
                     ["CloudFlow", "DataCanvas", "OpsPilot"],
                     p=[0.58, 0.24, 0.18],
@@ -273,9 +266,7 @@ def _generate_contracts(
                 "recognition_date": recognition_date,
                 "recognized_revenue": 0,
                 "recognized_cost": 0,
-                "contract_value": 750_000
-                if recognition_quarter == "deferred"
-                else 0,
+                "contract_value": 750_000 if recognition_quarter == "deferred" else 0,
             },
         )
 
@@ -433,9 +424,7 @@ def _generate_projects(
         start, end = QUARTERS[quarter]
         planned_end = end - timedelta(days=24)
         for contract_id in selected_contracts:
-            contract = contracts.loc[
-                contracts["contract_id"].eq(contract_id)
-            ].iloc[0]
+            contract = contracts.loc[contracts["contract_id"].eq(contract_id)].iloc[0]
             planned_date = _random_date(rng, start + timedelta(days=15), planned_end)
             rows.append(
                 {
@@ -536,9 +525,7 @@ def _generate_payments(
     )
     rows: list[dict[str, Any]] = []
     for index, contract_id in enumerate(selected_contracts):
-        contract = contracts.loc[
-            contracts["contract_id"].eq(contract_id)
-        ].iloc[0]
+        contract = contracts.loc[contracts["contract_id"].eq(contract_id)].iloc[0]
         payment_date = _random_date(rng, DATA_START, DATA_END)
         overdue_probability = 0.16 if payment_date >= date(2026, 4, 1) else 0.08
         rows.append(
@@ -550,9 +537,7 @@ def _generate_payments(
                 "amount": round(
                     max(10_000, contract["contract_value"] * rng.uniform(0.2, 0.6)),
                 ),
-                "status": "overdue"
-                if rng.random() < overdue_probability
-                else "paid",
+                "status": "overdue" if rng.random() < overdue_probability else "paid",
             },
         )
     return pd.DataFrame(rows)
@@ -716,9 +701,7 @@ def _quality_summary(
             for name, frame in tables.items()
         },
         "orphan_counts": orphan_counts,
-        "foreign_key_integrity": 1.0
-        if sum(orphan_counts.values()) == 0
-        else 0.0,
+        "foreign_key_integrity": 1.0 if sum(orphan_counts.values()) == 0 else 0.0,
         "core_metrics": calculate_core_metrics(tables),
     }
 
@@ -786,8 +769,7 @@ def generate_dataset(seed: int = DEFAULT_SEED) -> SyntheticDataset:
             },
             "margin_erosion": {
                 "description": (
-                    "Q2 high-customization share, hours and outsourcing "
-                    "cost rise."
+                    "Q2 high-customization share, hours and outsourcing cost rise."
                 ),
             },
             "v32_stability": {
@@ -853,8 +835,7 @@ def write_dataset(
 
     quality_summary_path = root / "data" / "data_quality_summary.json"
     quality_summary_path.write_text(
-        json.dumps(dataset.quality_summary, ensure_ascii=False, indent=2)
-        + "\n",
+        json.dumps(dataset.quality_summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     ground_truth_path = ground_truth_dir / "golden_case.json"

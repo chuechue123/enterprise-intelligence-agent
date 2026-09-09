@@ -249,8 +249,7 @@ class KnowledgeRetriever:
             if not overlap:
                 continue
             score = sum(
-                math.log((chunk_count + 1) / (self._document_frequency[term] + 1))
-                + 1
+                math.log((chunk_count + 1) / (self._document_frequency[term] + 1)) + 1
                 for term in overlap
             )
             title_overlap = overlap & set(chunk["title_terms"])

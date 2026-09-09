@@ -163,8 +163,8 @@ def apply_usage_scenario(
         "core_feature_uses": 0.55,
     }.items():
         product_usage.loc[affected_q2, column] = (
-            product_usage.loc[affected_q2, column] * factor
-        ).round().astype(int)
+            (product_usage.loc[affected_q2, column] * factor).round().astype(int)
+        )
 
 
 def apply_ticket_scenario(
@@ -212,9 +212,7 @@ def apply_ticket_scenario(
     support_tickets["first_response_hours"] = support_tickets[
         "first_response_hours"
     ].round(2)
-    support_tickets["resolution_hours"] = support_tickets[
-        "resolution_hours"
-    ].round(2)
+    support_tickets["resolution_hours"] = support_tickets["resolution_hours"].round(2)
 
 
 def apply_delivery_scenario(
@@ -248,12 +246,8 @@ def apply_delivery_scenario(
     q1_idx = projects.index[
         projects["planned_acceptance_quarter"].eq("2026-Q1")
     ].to_numpy()
-    on_time_q1 = rng.permutation(q1_idx)[
-        : SCENARIO_TARGETS["q1_on_time_projects"]
-    ]
-    on_time_q2 = rng.permutation(q2_eligible)[
-        : SCENARIO_TARGETS["q2_on_time_projects"]
-    ]
+    on_time_q1 = rng.permutation(q1_idx)[: SCENARIO_TARGETS["q1_on_time_projects"]]
+    on_time_q2 = rng.permutation(q2_eligible)[: SCENARIO_TARGETS["q2_on_time_projects"]]
     projects.loc[np.concatenate([on_time_q1, on_time_q2]), "on_time"] = True
 
     for row_index, row in projects.iterrows():
@@ -274,25 +268,17 @@ def apply_delivery_scenario(
         high_custom = projects.at[row_index, "customization_level"] == "high"
         if quarter == "2026-Q2":
             multiplier = (
-                rng.uniform(1.32, 1.55)
-                if high_custom
-                else rng.uniform(1.12, 1.28)
+                rng.uniform(1.32, 1.55) if high_custom else rng.uniform(1.12, 1.28)
             )
             outsourcing_rate = (
-                rng.uniform(0.20, 0.32)
-                if high_custom
-                else rng.uniform(0.10, 0.18)
+                rng.uniform(0.20, 0.32) if high_custom else rng.uniform(0.10, 0.18)
             )
         elif quarter == "2026-Q1":
             multiplier = (
-                rng.uniform(1.08, 1.20)
-                if high_custom
-                else rng.uniform(0.98, 1.10)
+                rng.uniform(1.08, 1.20) if high_custom else rng.uniform(0.98, 1.10)
             )
             outsourcing_rate = (
-                rng.uniform(0.10, 0.18)
-                if high_custom
-                else rng.uniform(0.03, 0.09)
+                rng.uniform(0.10, 0.18) if high_custom else rng.uniform(0.03, 0.09)
             )
         else:
             multiplier = rng.uniform(0.98, 1.15)

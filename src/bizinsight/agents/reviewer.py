@@ -108,7 +108,8 @@ class EvidenceReviewerAgent:
                     )
 
             internal_evidence = any(
-                item.evidence_type in {
+                item.evidence_type
+                in {
                     EvidenceType.DATABASE,
                     EvidenceType.CALCULATION,
                 }

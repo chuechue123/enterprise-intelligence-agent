@@ -70,9 +70,7 @@ class ReviewResult(BaseModel):
             raise ValueError(
                 "accepted status cannot contain rejections or revisions",
             )
-        if self.status is ReviewStatus.REJECTED and (
-            accepted or not rejected
-        ):
+        if self.status is ReviewStatus.REJECTED and (accepted or not rejected):
             raise ValueError(
                 "rejected status requires rejected findings and no accepted ones",
             )

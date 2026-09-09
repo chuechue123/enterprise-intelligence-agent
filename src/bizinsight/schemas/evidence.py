@@ -50,9 +50,7 @@ class Evidence(BaseModel):
         cls,
         value: datetime | None,
     ) -> datetime | None:
-        if value is not None and (
-            value.tzinfo is None or value.utcoffset() is None
-        ):
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
             raise ValueError("evidence timestamps must include a timezone")
         return value
 

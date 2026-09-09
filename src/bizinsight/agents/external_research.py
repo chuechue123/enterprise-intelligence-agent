@@ -57,9 +57,7 @@ class ExternalResearchAgent:
         )
         self.tool_names = {"search_external_information"}
         prompt = (
-            Path(__file__).resolve().parents[1]
-            / "prompts"
-            / "external_research.md"
+            Path(__file__).resolve().parents[1] / "prompts" / "external_research.md"
         ).read_text(encoding="utf-8")
         self.agent = Agent(
             name=WorkerName.EXTERNAL_RESEARCH.value,

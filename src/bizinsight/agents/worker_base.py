@@ -134,8 +134,7 @@ class WorkerBase(ABC):
     def _require_metric(self, metric_name: str) -> None:
         if metric_name not in self.allowed_metrics:
             raise DatasetAccessError(
-                f"{self.worker_name.value} cannot calculate metric "
-                f"{metric_name!r}",
+                f"{self.worker_name.value} cannot calculate metric {metric_name!r}",
             )
 
     def execute_sql(
@@ -221,9 +220,7 @@ class WorkerBase(ABC):
             result = self.knowledge_retriever.search(query, top_k=top_k)
             return {
                 "query": result.query,
-                "evidence": [
-                    item.model_dump(mode="json") for item in result.evidence
-                ],
+                "evidence": [item.model_dump(mode="json") for item in result.evidence],
                 "reason": result.reason,
             }
 
@@ -266,15 +263,13 @@ class WorkerBase(ABC):
 
         if task.target_agent is not self.worker_name:
             raise ValueError(
-                f"task targets {task.target_agent.value}, not "
-                f"{self.worker_name.value}",
+                f"task targets {task.target_agent.value}, not {self.worker_name.value}",
             )
         forbidden = set(task.required_datasets) - self.allowed_datasets
         if forbidden:
             names = ", ".join(sorted(forbidden))
             raise DatasetAccessError(
-                f"{self.worker_name.value} cannot access required datasets: "
-                f"{names}",
+                f"{self.worker_name.value} cannot access required datasets: {names}",
             )
 
         message = UserMsg(

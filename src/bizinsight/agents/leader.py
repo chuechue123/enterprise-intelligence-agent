@@ -21,14 +21,30 @@ QUARTER_DATES = {
 DOMAIN_CONFIG = {
     WorkerName.FINANCE_SALES: {
         "keywords": (
-            "收入", "营收", "毛利", "销售", "商机", "赢单", "输单", "回款", "合同",
+            "收入",
+            "营收",
+            "毛利",
+            "销售",
+            "商机",
+            "赢单",
+            "输单",
+            "回款",
+            "合同",
         ),
         "datasets": ["contracts", "opportunities", "payments", "customers"],
         "outputs": ["收入、毛利、赢单与回款异常 Finding"],
     },
     WorkerName.CUSTOMER_PRODUCT: {
         "keywords": (
-            "续费", "流失", "客户", "产品", "使用", "工单", "客服", "满意度", "版本",
+            "续费",
+            "流失",
+            "客户",
+            "产品",
+            "使用",
+            "工单",
+            "客服",
+            "满意度",
+            "版本",
         ),
         "datasets": ["subscriptions", "product_usage", "support_tickets", "customers"],
         "outputs": ["续费、使用与服务质量关联 Finding"],

@@ -112,9 +112,7 @@ def calculate_metric(
     row = query_result.rows[0]
     numerator = _decimal(row["numerator"])
     denominator_value = row["denominator"]
-    denominator = (
-        None if denominator_value is None else _decimal(denominator_value)
-    )
+    denominator = None if denominator_value is None else _decimal(denominator_value)
     if denominator is None:
         value = numerator
     else:
