@@ -78,6 +78,10 @@ class QueryTimeoutError(TimeoutError):
     """Raised when SQLite exceeds the configured execution deadline."""
 
 
+class DatasetAccessError(PermissionError):
+    """Raised when a scoped query reads a dataset outside its allowlist."""
+
+
 @dataclass(frozen=True)
 class QueryResult:
     """Bounded rows and the evidence required to reproduce their query."""
@@ -241,19 +245,28 @@ class BusinessDataProvider:
             timeout_ms=timeout_ms,
         )
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(
+        self,
+        allowed_datasets: frozenset[str] | None = None,
+    ) -> sqlite3.Connection:
         uri = f"{self.database_path.as_uri()}?mode=ro"
         connection = sqlite3.connect(uri, uri=True)
         connection.row_factory = sqlite3.Row
 
         def authorizer(
             action: int,
-            _arg1: str | None,
+            arg1: str | None,
             _arg2: str | None,
             _database: str | None,
             _trigger: str | None,
         ) -> int:
             if action in WRITE_ACTIONS:
+                return sqlite3.SQLITE_DENY
+            if (
+                allowed_datasets is not None
+                and action == sqlite3.SQLITE_READ
+                and arg1 not in allowed_datasets
+            ):
                 return sqlite3.SQLITE_DENY
             return sqlite3.SQLITE_OK
 
@@ -291,6 +304,7 @@ class BusinessDataProvider:
         parameters: Sequence[Any] = (),
         max_rows: int | None = None,
         timeout_ms: int | None = None,
+        allowed_datasets: Sequence[str] | None = None,
     ) -> QueryResult:
         query = validate_readonly_sql(sql)
         requested_rows = self.max_rows if max_rows is None else max_rows
@@ -302,11 +316,19 @@ class BusinessDataProvider:
         row_limit = min(requested_rows, self.max_rows)
         query_timeout = min(requested_timeout, self.timeout_ms)
         bound_parameters = tuple(parameters)
+        dataset_scope = (
+            None if allowed_datasets is None else frozenset(allowed_datasets)
+        )
+        if dataset_scope is not None:
+            unknown_datasets = dataset_scope - set(self.list_datasets())
+            if unknown_datasets:
+                names = ", ".join(sorted(unknown_datasets))
+                raise KeyError(f"unknown dataset scope: {names}")
         wrapped_query = f"SELECT * FROM ({query}) AS _bizinsight_query LIMIT ?"
         deadline = time.monotonic() + query_timeout / 1_000
         started = time.monotonic()
 
-        with self._connect() as connection:
+        with self._connect(dataset_scope) as connection:
             connection.set_progress_handler(
                 lambda: int(time.monotonic() >= deadline),
                 100,
@@ -317,11 +339,13 @@ class BusinessDataProvider:
                     (*bound_parameters, row_limit + 1),
                 )
                 raw_rows = cursor.fetchall()
-            except sqlite3.OperationalError as exc:
+            except sqlite3.DatabaseError as exc:
                 if "interrupted" in str(exc).lower():
                     raise QueryTimeoutError(
                         f"query exceeded {query_timeout} ms timeout",
                     ) from exc
+                if "prohibited" in str(exc).lower():
+                    raise DatasetAccessError(str(exc)) from exc
                 if "not authorized" in str(exc).lower():
                     raise UnsafeQueryError(
                         "SQLite denied a non-read operation",
