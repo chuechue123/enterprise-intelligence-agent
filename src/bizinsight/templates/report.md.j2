@@ -1,0 +1,53 @@
+# BizInsight 企业经营异常诊断报告
+
+> 分析问题：{{ question }}
+
+{% for section in sections %}
+## {{ loop.index }}. {{ section }}
+
+{% if section == "执行摘要" %}
+本报告仅汇总证据审查通过的 {{ findings|length }} 条结论。{% if findings %}最需关注：{{ findings[0].title }}。{% endif %}
+{% elif section == "核心指标概览" %}
+{% if findings %}{% for finding in findings %}{% for metric in finding.metrics %}- {{ metric.metric_name }}（{{ metric.period }}）：{{ metric.value }} {{ metric.unit }}，证据 {% for id in metric.evidence_ids %}[{{ id }}](#evidence-{{ id|lower }}){% if not loop.last %}、{% endif %}{% endfor %}
+{% endfor %}{% endfor %}{% else %}- 暂无已审查指标。
+{% endif %}
+{% for chart in charts %}![{{ chart.title }}]({{ chart.relative_path }})
+{% endfor %}
+{% elif section == "主要异常排名" %}
+{% for finding in findings %}{{ loop.index }}. **{{ finding.title }}**（置信度 {{ "%.0f"|format(finding.confidence * 100) }}%）：{{ finding.fact_statement }} {% for item in finding.evidence %}[{{ item.evidence_id }}](#evidence-{{ item.evidence_id|lower }}){% if not loop.last %}、{% endif %}{% endfor %}
+{% else %}- 暂无通过审查的异常。
+{% endfor %}
+{% elif section == "财务与销售分析" %}
+{% for finding in findings if "收入" in finding.title or "销售" in finding.title or "赢单" in finding.title or "毛利" in finding.title %}- **{{ finding.title }}**：{{ finding.business_interpretation }}
+{% else %}- 本次没有该领域的已审查结论。
+{% endfor %}
+{% elif section == "客户、产品与服务分析" %}
+{% for finding in findings if "续费" in finding.title or "客户" in finding.title or "产品" in finding.title or "工单" in finding.title %}- **{{ finding.title }}**：{{ finding.business_interpretation }}
+{% else %}- 本次没有该领域的已审查结论。
+{% endfor %}
+{% elif section == "项目交付分析" %}
+{% for finding in findings if "交付" in finding.title or "验收" in finding.title or "项目" in finding.title %}- **{{ finding.title }}**：{{ finding.business_interpretation }}
+{% else %}- 本次没有该领域的已审查结论。
+{% endfor %}
+{% elif section == "外部行业背景" %}
+{% for finding in findings if not finding.is_key %}- **{{ finding.title }}**：{{ finding.fact_statement }}
+{% else %}- 外部信息仅作背景，当前没有可用实时搜索结果。
+{% endfor %}
+{% elif section == "根因假设与置信度" %}
+{% for finding in findings %}- {{ finding.title }}（{{ "%.0f"|format(finding.confidence * 100) }}%）：{{ finding.causal_assessment or "仅陈述关联，尚未确认因果。" }}
+{% endfor %}
+{% elif section == "行动建议" %}
+{% for action in actions %}- **{{ action.priority }}｜{{ action.action }}**；依据：{{ action.rationale }}；负责人：{{ action.owner_type }}；时间：{{ action.timeframe }}
+{% else %}- 暂无行动建议。
+{% endfor %}
+{% elif section == "数据限制与待验证问题" %}
+{% for limitation in limitations %}- {{ limitation }}
+{% else %}- 未发现额外数据限制。
+{% endfor %}
+{% elif section == "证据索引" %}
+{% for item in evidence %}<a id="evidence-{{ item.evidence_id|lower }}"></a>
+- **{{ item.evidence_id }}**｜{{ item.evidence_type.value }}｜{{ item.source }}｜{{ item.locator }}：{{ item.summary }}{% if item.url %}（{{ item.url }}）{% endif %}
+{% else %}- 无证据条目。
+{% endfor %}
+{% endif %}
+{% endfor %}
