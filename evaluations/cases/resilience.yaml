@@ -1,0 +1,20 @@
+- id: delivery-acceptance
+  question: 2026年第二季度项目按时验收情况如何
+  expected_metrics: {on_time_acceptance_rate: 0.638889}
+  expected_anomalies: [验收]
+- id: delivery-delay
+  question: 分析2026-Q2项目延期和交付风险
+  expected_metrics: {on_time_acceptance_rate: 0.638889}
+  expected_anomalies: [交付]
+- id: external-market
+  question: 调研企业低代码行业竞争趋势
+  expected_metrics: {}
+  expected_anomalies: [行业]
+- id: external-policy
+  question: 外部市场和竞品价格对我们意味着什么
+  expected_metrics: {}
+  expected_anomalies: [竞争]
+- id: unspecified-period
+  question: 最近经营表现怎么样
+  expected_metrics: {revenue: 16400000}
+  expected_anomalies: [收入]

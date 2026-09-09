@@ -1,0 +1,20 @@
+- id: finance-revenue
+  question: 为什么2026年第二季度收入下降
+  expected_metrics: {revenue: 16400000, gross_margin: 0.389, win_rate: 0.22}
+  expected_anomalies: [收入, 毛利, 赢单]
+- id: finance-margin
+  question: 分析2026-Q2毛利率和销售赢单情况
+  expected_metrics: {gross_margin: 0.389, win_rate: 0.22}
+  expected_anomalies: [毛利, 赢单]
+- id: finance-sales
+  question: 2026年二季度销售转化为什么承压
+  expected_metrics: {revenue: 16400000, win_rate: 0.22}
+  expected_anomalies: [销售, 赢单]
+- id: customer-renewal
+  question: 2026-Q2客户续费表现如何
+  expected_metrics: {renewal_rate: 0.728395}
+  expected_anomalies: [续费]
+- id: customer-product
+  question: 分析2026年第二季度产品使用、工单和续费风险
+  expected_metrics: {renewal_rate: 0.728395}
+  expected_anomalies: [续费, 产品]

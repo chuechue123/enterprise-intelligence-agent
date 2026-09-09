@@ -1,0 +1,20 @@
+- id: comprehensive-golden
+  question: 请综合分析2026年第二季度经营表现及主要原因
+  expected_metrics: {revenue: 16400000, gross_margin: 0.389, renewal_rate: 0.728395, win_rate: 0.22, on_time_acceptance_rate: 0.638889}
+  expected_anomalies: [收入, 毛利, 赢单, 续费, 验收]
+- id: comprehensive-management
+  question: 管理层需要一份2026年Q2经营异常诊断
+  expected_metrics: {revenue: 16400000, gross_margin: 0.389, renewal_rate: 0.728395, win_rate: 0.22, on_time_acceptance_rate: 0.638889}
+  expected_anomalies: [收入, 毛利, 赢单, 续费, 验收]
+- id: comprehensive-causes
+  question: 2026年第二季度有哪些经营异常和可能原因
+  expected_metrics: {revenue: 16400000, gross_margin: 0.389, renewal_rate: 0.728395, win_rate: 0.22, on_time_acceptance_rate: 0.638889}
+  expected_anomalies: [收入, 毛利, 赢单, 续费, 验收]
+- id: comprehensive-actions
+  question: 分析2026-Q2经营表现并给出行动建议
+  expected_metrics: {revenue: 16400000, gross_margin: 0.389, renewal_rate: 0.728395, win_rate: 0.22, on_time_acceptance_rate: 0.638889}
+  expected_anomalies: [收入, 毛利, 赢单, 续费, 验收]
+- id: comprehensive-evidence
+  question: 用可追溯证据解释2026年第二季度的经营表现
+  expected_metrics: {revenue: 16400000}
+  expected_anomalies: [收入]
