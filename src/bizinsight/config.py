@@ -28,6 +28,10 @@ class BizInsightSettings(BaseSettings):
         default=None,
         validation_alias="BIZINSIGHT_MODEL_NAME",
     )
+    tavily_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias="TAVILY_API_KEY",
+    )
 
     @field_validator("dashscope_api_key", "model_name", mode="before")
     @classmethod

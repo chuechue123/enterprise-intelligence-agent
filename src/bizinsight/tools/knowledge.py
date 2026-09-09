@@ -171,7 +171,8 @@ def build_knowledge_index(knowledge_dir: Path, output_path: Path) -> dict[str, A
     source_paths = sorted(
         path
         for path in knowledge_dir.rglob("*.md")
-        if "external_fallback" not in path.parts
+        if knowledge_dir.name == "external_fallback"
+        or "external_fallback" not in path.parts
     )
     if not source_paths:
         raise ValueError(f"no Markdown knowledge documents found in {knowledge_dir}")
