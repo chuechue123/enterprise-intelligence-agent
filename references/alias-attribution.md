@@ -12,7 +12,7 @@
 
 The commit above is the reproducible reference baseline for compatibility review and selective migration. A moving branch name such as `main` is not used as evidence of the reviewed source version.
 
-## Planned selective migration
+## Completed selective migration
 
 No Alias source code was copied into BizInsight Agent at project initialization. Task 2 completed the compatibility audit; detailed evidence is recorded in `docs/alias-compatibility-audit.md`.
 
@@ -24,7 +24,7 @@ No Alias source code was copied into BizInsight Agent at project initialization.
 | `src/alias/agent/agents/_deep_research_agent_v2.py` | Delete the generic research tree; rewrite a narrow evidence flow |
 | Alias data-source utilities | Rewrite behind `BusinessDataProvider` |
 | `src/alias/agent/tools/` | Migrate organization only; replace implementations with allowlisted domain tools |
-| Runtime runner | Delete Alias runner; integrate directly with the 2.0.7 service API in task 12 |
+| Runtime runner | Deleted Alias runner; integrated the BizInsight workflow with AgentScope 2.0.7 `create_app`, CLI and custom events |
 
 ## Explicitly excluded Alias scope
 
