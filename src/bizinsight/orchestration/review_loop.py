@@ -32,7 +32,9 @@ async def run_review_cycle(
 ) -> ReviewCycleResult:
     """Revise all targeted findings in one round, never recursively."""
 
-    initial = reviewer.review(findings, owners, allow_revision=True)
+    initial = await reviewer.review_with_semantics(
+        findings, owners, allow_revision=True
+    )
     if not initial.revision_requests:
         return ReviewCycleResult(tuple(findings), initial, initial, 0)
 
@@ -50,7 +52,9 @@ async def run_review_cycle(
             updated[request.finding_id] = replacement
 
     revised_findings = tuple(updated[item.finding_id] for item in findings)
-    final = reviewer.review(revised_findings, owners, allow_revision=False)
+    final = await reviewer.review_with_semantics(
+        revised_findings, owners, allow_revision=False
+    )
     if final.status.value != "accepted" and not final.data_limitations:
         final = final.model_copy(
             update={"data_limitations": ["定向返工后仍未通过证据审查。"]},

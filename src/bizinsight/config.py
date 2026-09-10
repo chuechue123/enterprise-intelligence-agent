@@ -24,16 +24,32 @@ class BizInsightSettings(BaseSettings):
         default=None,
         validation_alias="DASHSCOPE_API_KEY",
     )
-    model_name: str | None = Field(
-        default=None,
+    model_name: str = Field(
+        default="qwen-plus",
         validation_alias="BIZINSIGHT_MODEL_NAME",
+    )
+    embedding_model: str = Field(
+        default="text-embedding-v4",
+        validation_alias="BIZINSIGHT_EMBEDDING_MODEL",
+    )
+    embedding_dimensions: int = Field(
+        default=1024,
+        validation_alias="BIZINSIGHT_EMBEDDING_DIMENSIONS",
+        ge=64,
+        le=4096,
     )
     tavily_api_key: SecretStr | None = Field(
         default=None,
         validation_alias="TAVILY_API_KEY",
     )
+    enable_business_mcp: bool = Field(
+        default=True,
+        validation_alias="BIZINSIGHT_ENABLE_BUSINESS_MCP",
+    )
 
-    @field_validator("dashscope_api_key", "model_name", mode="before")
+    @field_validator(
+        "dashscope_api_key", "model_name", "embedding_model", mode="before"
+    )
     @classmethod
     def empty_strings_are_missing(cls, value: object) -> object:
         """Treat blank environment variables as absent configuration."""
@@ -47,13 +63,17 @@ class BizInsightSettings(BaseSettings):
         missing: list[str] = []
         if self.dashscope_api_key is None:
             missing.append("DASHSCOPE_API_KEY")
-        if self.model_name is None:
-            missing.append("BIZINSIGHT_MODEL_NAME")
-
         if missing:
             names = ", ".join(missing)
             raise ConfigurationError(
                 "Online model mode requires explicit environment variables: "
                 f"{names}. Copy .env.example to .env and provide values; "
                 "no API key or model name is inferred.",
+            )
+
+    def require_online_embedding(self) -> None:
+        """Validate configuration before a paid embedding request."""
+        if self.dashscope_api_key is None:
+            raise ConfigurationError(
+                "Online embedding mode requires DASHSCOPE_API_KEY."
             )

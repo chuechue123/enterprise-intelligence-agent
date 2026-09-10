@@ -34,6 +34,21 @@ class DateRange(BaseModel):
             raise ValueError("start_date must be on or before end_date")
         return self
 
+    @property
+    def quarter(self) -> str:
+        """Return the canonical quarter represented by this range."""
+        return f"{self.start_date.year}-Q{((self.start_date.month - 1) // 3) + 1}"
+
+
+class AnalysisContext(BaseModel):
+    """Immutable period and segmentation context shared with a Worker."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    current_period: str = Field(pattern=r"^\d{4}-Q[1-4]$")
+    comparison_period: str = Field(pattern=r"^\d{4}-Q[1-4]$")
+    filters: dict[str, NonEmptyStr] = Field(default_factory=dict)
+
 
 class AnalysisTask(BaseModel):
     """One typed unit of work assigned to a domain Worker."""
@@ -46,6 +61,7 @@ class AnalysisTask(BaseModel):
     required_datasets: list[NonEmptyStr] = Field(min_length=1)
     expected_outputs: list[NonEmptyStr] = Field(min_length=1)
     depends_on: list[str] = Field(default_factory=list)
+    context: AnalysisContext | None = None
 
     @model_validator(mode="after")
     def validate_unique_lists(self) -> AnalysisTask:

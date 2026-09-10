@@ -65,7 +65,7 @@ class _StructuredMockModel(ChatModelBase):
         )
 
 
-def test_online_configuration_requires_key_and_model(
+def test_online_configuration_requires_key_and_uses_safe_model_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
@@ -77,7 +77,7 @@ def test_online_configuration_requires_key_and_model(
 
     message = str(exc_info.value)
     assert "DASHSCOPE_API_KEY" in message
-    assert "BIZINSIGHT_MODEL_NAME" in message
+    assert settings.model_name == "qwen-plus"
 
 
 def test_dashscope_model_uses_only_explicit_configuration() -> None:

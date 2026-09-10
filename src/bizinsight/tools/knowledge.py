@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import re
-from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -14,6 +12,7 @@ from typing import Any
 
 import yaml
 
+from bizinsight.rag.bm25 import BM25Index
 from bizinsight.schemas import Evidence, EvidenceType
 
 DOCUMENT_ID_PATTERN = re.compile(r"^DOC-[A-Z0-9]+(?:-[A-Z0-9]+)*$")
@@ -223,9 +222,7 @@ class KnowledgeRetriever:
         self._chunks = list(index.get("chunks", []))
         if not self._chunks:
             raise ValueError("knowledge index contains no chunks")
-        self._document_frequency = Counter(
-            term for chunk in self._chunks for term in set(chunk["terms"])
-        )
+        self._bm25 = BM25Index(self._chunks, tokenizer=_tokenize)
 
     @classmethod
     def from_index(cls, index_path: Path) -> KnowledgeRetriever:
@@ -241,29 +238,19 @@ class KnowledgeRetriever:
             raise ValueError("top_k must be between 1 and 20")
 
         query_terms = set(_tokenize(query))
-        ranked: list[tuple[float, dict[str, Any]]] = []
-        chunk_count = len(self._chunks)
-        for chunk in self._chunks:
-            chunk_terms = set(chunk["terms"])
-            overlap = query_terms & chunk_terms
-            if not overlap:
-                continue
-            score = sum(
-                math.log((chunk_count + 1) / (self._document_frequency[term] + 1)) + 1
-                for term in overlap
-            )
-            title_overlap = overlap & set(chunk["title_terms"])
-            score += 1.5 * len(title_overlap)
-            ranked.append((score, chunk))
-
-        ranked.sort(
+        candidates = self._bm25.search(query, top_k=min(len(self._chunks), top_k * 5))
+        selected = sorted(
+            candidates,
             key=lambda item: (
-                -item[0],
+                -(
+                    item[0]
+                    + len(query_terms & set(item[1]["terms"]))
+                    + 4 * len(query_terms & set(item[1]["title_terms"]))
+                ),
                 item[1]["document_id"],
                 item[1]["chunk_id"],
             ),
-        )
-        selected = ranked[:top_k]
+        )[:top_k]
         if not selected:
             return KnowledgeSearchResult(
                 query=query,

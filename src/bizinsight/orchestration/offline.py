@@ -9,6 +9,7 @@ from bizinsight.schemas import AnalysisTask, Evidence, Finding, WorkerName
 from bizinsight.tools.external_search import ExternalSearchService
 from bizinsight.tools.knowledge import KnowledgeRetriever
 from bizinsight.tools.metrics import MetricComparison, compare_periods
+from bizinsight.tools.segments import analyze_segments
 
 WORKER_METRICS = {
     WorkerName.FINANCE_SALES: ("revenue", "gross_margin", "win_rate"),
@@ -51,8 +52,10 @@ class DeterministicDomainWorker:
     async def analyze(self, task: AnalysisTask) -> Finding:
         if task.target_agent is not self.worker_name:
             raise ValueError(f"task is not assigned to {self.worker_name.value}")
-        current = "2026-Q2"
-        comparison = "2026-Q1"
+        if task.context is None:
+            raise ValueError("analysis task is missing period context")
+        current = task.context.current_period
+        comparison = task.context.comparison_period
         comparisons = [
             compare_periods(
                 self.provider,
@@ -63,7 +66,7 @@ class DeterministicDomainWorker:
             for name in WORKER_METRICS[self.worker_name]
         ]
         query = {
-            WorkerName.FINANCE_SALES: "2026年二季度 销售 输单 价格竞争 毛利",
+            WorkerName.FINANCE_SALES: f"{current} 销售 输单 价格竞争 毛利",
             WorkerName.CUSTOMER_PRODUCT: "CloudFlow 3.2 续费 产品故障 工单 客户反馈",
             WorkerName.DELIVERY: "项目延期 验收 定制 工时 收入确认",
         }[self.worker_name]
@@ -85,10 +88,36 @@ class DeterministicDomainWorker:
             for item in comparisons
         )
         limitations = [] if document_result.evidence else [str(document_result.reason)]
+        segment_note = ""
+        if task.context.filters:
+            dimension, value = next(iter(task.context.filters.items()))
+            dataset = {
+                WorkerName.FINANCE_SALES: "contracts",
+                WorkerName.CUSTOMER_PRODUCT: (
+                    "product_usage"
+                    if dimension == "product_version"
+                    else "subscriptions"
+                ),
+                WorkerName.DELIVERY: "projects",
+            }[self.worker_name]
+            try:
+                segment = analyze_segments(
+                    self.provider,
+                    dataset=dataset,
+                    dimension=dimension,
+                    period=current,
+                    dimension_value=value,
+                )
+                evidence.append(segment.evidence)
+                segment_note = (
+                    f"；已按 {dimension}={value} 查询 {len(segment.rows)} 个细分结果"
+                )
+            except ValueError as exc:
+                limitations.append(str(exc))
         return Finding(
             finding_id=f"FINDING-{self.worker_name.value.replace('Agent', '').lower()}",
             title=TITLES[self.worker_name],
-            fact_statement=f"2026-Q1 到 2026-Q2：{changes}。",
+            fact_statement=f"{comparison} 到 {current}：{changes}{segment_note}。",
             metrics=metrics,
             evidence=evidence,
             business_interpretation=INTERPRETATIONS[self.worker_name],

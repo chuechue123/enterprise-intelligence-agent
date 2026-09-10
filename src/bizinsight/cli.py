@@ -44,6 +44,7 @@ async def _main() -> None:
                 "report_html": str(result.report.html_path),
                 "events": str(result.event_path),
                 "errors": result.errors,
+                "run_id": result.telemetry.run_id,
             },
             ensure_ascii=False,
             indent=2,

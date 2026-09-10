@@ -1,0 +1,15 @@
+- id: incident
+  query: CloudFlow 3.2 故障 工单 客户影响
+  expected_document: DOC-INCIDENT-202604
+- id: delivery
+  query: 高定制项目 工时失控 延期验收
+  expected_document: DOC-DELIVERY-PLAYBOOK-001
+- id: sales
+  query: 二季度输单 价格竞争 折扣
+  expected_document: DOC-SALES-WINLOSS-2026Q2
+- id: revenue
+  query: 项目验收之后如何确认收入
+  expected_document: DOC-FINANCE-REVREC-001
+- id: retention
+  query: 18家到期客户 采购预算 套餐价格 专项回访
+  expected_document: DOC-CUSTOMER-INTERVIEW-2026Q2

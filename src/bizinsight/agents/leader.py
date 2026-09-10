@@ -3,21 +3,16 @@
 from __future__ import annotations
 
 import re
-from datetime import date
 from pathlib import Path
 
 from agentscope.agent import Agent, InjectionConfig, ReActConfig
 from agentscope.message import UserMsg
 from agentscope.model import ChatModelBase
 
-from bizinsight.schemas import AnalysisPlan, AnalysisTask, DateRange, WorkerName
+from bizinsight.data.provider import BusinessDataProvider
+from bizinsight.schemas import AnalysisContext, AnalysisPlan, AnalysisTask, WorkerName
+from bizinsight.time_periods import quarter_range, resolve_periods
 
-QUARTER_DATES = {
-    1: ((1, 1), (3, 31)),
-    2: ((4, 1), (6, 30)),
-    3: ((7, 1), (9, 30)),
-    4: ((10, 1), (12, 31)),
-}
 DOMAIN_CONFIG = {
     WorkerName.FINANCE_SALES: {
         "keywords": (
@@ -60,24 +55,37 @@ DOMAIN_CONFIG = {
         "outputs": ["带来源且不越过因果边界的行业背景"],
     },
 }
+FILTER_VALUES = {
+    "region": ("华东", "华南", "华北", "西南", "华中"),
+    "industry": ("制造", "金融", "零售", "医疗", "教育"),
+    "size_segment": ("SMB", "Mid-Market", "Enterprise"),
+}
 
 
-def _quarter_range(year: int, quarter: int) -> DateRange:
-    start, end = QUARTER_DATES[quarter]
-    return DateRange(
-        start_date=date(year, *start),
-        end_date=date(year, *end),
-    )
-
-
-def _previous_quarter(year: int, quarter: int) -> tuple[int, int]:
-    return (year - 1, 4) if quarter == 1 else (year, quarter - 1)
+def _filters_from_question(question: str) -> dict[str, str]:
+    filters: dict[str, str] = {}
+    lowered = question.lower()
+    for dimension, values in FILTER_VALUES.items():
+        for value in values:
+            if value.lower() in lowered:
+                filters[dimension] = value
+                break
+    version = re.search(r"(?:v|版本\s*)(\d+(?:\.\d+)+)", question, re.I)
+    if version:
+        filters["product_version"] = f"v{version.group(1)}"
+    return filters
 
 
 class BizInsightLeader:
     """Create a bounded AnalysisPlan and hand it to the workflow scheduler."""
 
-    def __init__(self, model: ChatModelBase | None = None) -> None:
+    def __init__(
+        self,
+        model: ChatModelBase | None = None,
+        provider: BusinessDataProvider | None = None,
+    ) -> None:
+        self.provider = provider
+        self.last_usage = None
         self.agent: Agent | None = None
         if model is not None:
             prompt = (
@@ -94,31 +102,23 @@ class BizInsightLeader:
                 injection_config=InjectionConfig(inject_runtime_state=False),
             )
 
-    @staticmethod
-    def _period_from_question(question: str) -> tuple[int, int, bool]:
-        match = re.search(
-            r"(20\d{2})\s*年?\s*(?:第?\s*([一二三四1234])\s*季度|Q([1-4]))",
-            question,
-            flags=re.IGNORECASE,
-        )
-        if not match:
-            return 2026, 2, True
-        quarter_token = match.group(2) or match.group(3)
-        quarter = (
-            int(quarter_token)
-            if quarter_token.isdigit()
-            else {"一": 1, "二": 2, "三": 3, "四": 4}[quarter_token]
-        )
-        return int(match.group(1)), quarter, False
-
     def plan_offline(self, question: str) -> AnalysisPlan:
         """Produce a deterministic plan when no online model is requested."""
 
         question = question.strip()
         if not question:
             raise ValueError("question must not be empty")
-        year, quarter, assumed = self._period_from_question(question)
-        previous_year, previous_quarter = _previous_quarter(year, quarter)
+        if self.provider is None:
+            from bizinsight.data.provider import BusinessDataProvider
+
+            root = Path(__file__).resolve().parents[3]
+            self.provider = BusinessDataProvider(
+                database_path=root / "data/database/bizinsight.sqlite",
+                table_dictionary_path=root / "data/data_dictionary/tables.yaml",
+                metric_dictionary_path=root / "data/data_dictionary/metrics.yaml",
+            )
+        current, comparison, assumed = resolve_periods(question, self.provider)
+        filters = _filters_from_question(question)
         comprehensive = any(
             keyword in question
             for keyword in ("综合", "经营表现", "主要原因", "经营异常")
@@ -141,17 +141,24 @@ class BizInsightLeader:
                 question=question,
                 required_datasets=list(DOMAIN_CONFIG[worker]["datasets"]),
                 expected_outputs=list(DOMAIN_CONFIG[worker]["outputs"]),
+                context=AnalysisContext(
+                    current_period=current,
+                    comparison_period=comparison,
+                    filters=filters,
+                ),
             )
             for index, worker in enumerate(targets[:4], start=1)
         ]
         assumptions = []
         if assumed:
-            assumptions.append("问题未指定时间范围，使用数据中的最近完整季度 2026-Q2。")
+            assumptions.append(
+                f"问题未指定时间范围，使用数据中的最近完整季度 {current}。"
+            )
         assumptions.append("所有关键数字由只读 SQL/Python 工具计算。")
         return AnalysisPlan(
             goal=question,
-            current_period=_quarter_range(year, quarter),
-            comparison_period=_quarter_range(previous_year, previous_quarter),
+            current_period=quarter_range(current),
+            comparison_period=quarter_range(comparison),
             assumptions=assumptions,
             tasks=tasks,
         )
@@ -165,6 +172,23 @@ class BizInsightLeader:
             UserMsg(name="user", content=question),
             structured_schema=AnalysisPlan,
         )
+        self.last_usage = response.usage
         if response.structured_output is None:
             return self.plan_offline(question)
-        return AnalysisPlan.model_validate(response.structured_output)
+        plan = AnalysisPlan.model_validate(response.structured_output)
+        current = plan.current_period.quarter
+        comparison = plan.comparison_period.quarter
+        tasks = [
+            task
+            if task.context is not None
+            else task.model_copy(
+                update={
+                    "context": AnalysisContext(
+                        current_period=current,
+                        comparison_period=comparison,
+                    )
+                }
+            )
+            for task in plan.tasks
+        ]
+        return plan.model_copy(update={"tasks": tasks})

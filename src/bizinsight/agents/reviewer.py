@@ -9,6 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from agentscope.agent import Agent, InjectionConfig, ReActConfig
+from agentscope.message import UserMsg
 from agentscope.model import ChatModelBase
 
 from bizinsight.data.provider import BusinessDataProvider
@@ -34,6 +35,7 @@ class EvidenceReviewerAgent:
         model: ChatModelBase | None = None,
     ) -> None:
         self.provider = provider
+        self.last_usage = None
         self.agent: Agent | None = None
         if model is not None:
             prompt = (
@@ -166,3 +168,80 @@ class EvidenceReviewerAgent:
             data_limitations=list(dict.fromkeys(limitations)),
             reviewer_notes="已完成指标复算、证据完整性、冲突与因果边界审查。",
         )
+
+    async def review_with_semantics(
+        self,
+        findings: Sequence[Finding],
+        owners: Mapping[str, WorkerName] | None = None,
+        *,
+        allow_revision: bool = True,
+    ) -> ReviewResult:
+        """Run deterministic guardrails first, then optional AgentScope judgment."""
+        hard = self.review(findings, owners, allow_revision=allow_revision)
+        if self.agent is None or hard.status is not ReviewStatus.ACCEPTED:
+            return hard
+        response = await self.agent.reply(
+            UserMsg(
+                name="BizInsightWorkflow",
+                content=(
+                    "硬规则审查已通过。请只审查解释是否谨慎、结论是否与证据一致；"
+                    "不得改写指标。返回 ReviewResult。\n"
+                    + "\n".join(item.model_dump_json() for item in findings)
+                ),
+            ),
+            structured_schema=ReviewResult,
+        )
+        self.last_usage = response.usage
+        if response.structured_output is None:
+            return hard.model_copy(
+                update={
+                    "reviewer_notes": hard.reviewer_notes
+                    + " 语义审查无结构化输出，保留硬规则结果。"
+                }
+            )
+        semantic = ReviewResult.model_validate(response.structured_output)
+        known = {item.finding_id for item in findings}
+        mentioned = (
+            set(semantic.accepted_finding_ids)
+            | set(semantic.rejected_finding_ids)
+            | {item.finding_id for item in semantic.revision_requests}
+        )
+        if not mentioned <= known:
+            return hard.model_copy(
+                update={
+                    "reviewer_notes": hard.reviewer_notes
+                    + " 语义审查引用未知 Finding，已忽略。"
+                }
+            )
+        if allow_revision and semantic.revision_requests:
+            owner_map = owners or {}
+            requests = [
+                request.model_copy(
+                    update={"target_agent": owner_map[request.finding_id]}
+                )
+                for request in semantic.revision_requests
+                if request.finding_id in owner_map
+            ]
+            semantic = semantic.model_copy(update={"revision_requests": requests})
+        if not allow_revision and semantic.revision_requests:
+            rejected = list(
+                dict.fromkeys(
+                    semantic.rejected_finding_ids
+                    + [item.finding_id for item in semantic.revision_requests]
+                )
+            )
+            accepted = [
+                item for item in semantic.accepted_finding_ids if item not in rejected
+            ]
+            status = ReviewStatus.PARTIAL if accepted else ReviewStatus.REJECTED
+            semantic = semantic.model_copy(
+                update={
+                    "status": status,
+                    "accepted_finding_ids": accepted,
+                    "rejected_finding_ids": rejected,
+                    "revision_requests": [],
+                    "data_limitations": semantic.data_limitations
+                    + ["单轮返工结束后仍存在语义审查问题。"],
+                }
+            )
+        return semantic

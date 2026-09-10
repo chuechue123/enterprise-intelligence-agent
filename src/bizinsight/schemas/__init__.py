@@ -3,6 +3,7 @@
 from bizinsight.schemas.evidence import Evidence, EvidenceType
 from bizinsight.schemas.finding import Finding, MetricValue
 from bizinsight.schemas.plan import (
+    AnalysisContext,
     AnalysisPlan,
     AnalysisTask,
     DateRange,
@@ -15,6 +16,7 @@ from bizinsight.schemas.review import (
 )
 
 __all__ = [
+    "AnalysisContext",
     "AnalysisPlan",
     "AnalysisTask",
     "DateRange",

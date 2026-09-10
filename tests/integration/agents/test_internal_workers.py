@@ -371,6 +371,7 @@ def test_workers_expose_no_general_file_or_ground_truth_tool(
 
     for worker in workers:
         assert worker.tool_names == {
+            "analyze_business_segments",
             "calculate_metric",
             "compare_periods",
             "describe_dataset",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from abc import ABC
 from collections.abc import Sequence
 from pathlib import Path
@@ -25,6 +26,7 @@ from bizinsight.tools.metrics import (
     calculate_metric,
     compare_periods,
 )
+from bizinsight.tools.segments import analyze_segments
 
 ScalarParameter = str | int | float | bool | None
 
@@ -57,6 +59,13 @@ class _ComparisonInput(BaseModel):
 class _RetrievalInput(BaseModel):
     query: str = Field(min_length=1)
     top_k: int = Field(default=5, ge=1, le=10)
+
+
+class _SegmentInput(BaseModel):
+    dataset: str = Field(min_length=1)
+    dimension: str = Field(min_length=1)
+    period: str = Field(pattern=r"^\d{4}-Q[1-4]$")
+    dimension_value: str | None = None
 
 
 def _query_result_payload(result: QueryResult) -> dict[str, Any]:
@@ -96,6 +105,7 @@ class WorkerBase(ABC):
     ) -> None:
         self.provider = provider
         self.knowledge_retriever = knowledge_retriever
+        self.last_usage = None
         self.toolkit = self._build_toolkit()
         self.tool_names = {
             tool.name for group in self.toolkit.tool_groups for tool in group.tools
@@ -111,6 +121,21 @@ class WorkerBase(ABC):
             ),
             injection_config=InjectionConfig(inject_runtime_state=False),
         )
+        self._mcp_connection = None
+
+    async def attach_business_mcp(self, project_root: Path) -> list[str]:
+        """Add scoped MCP tools through AgentScope without changing local logic."""
+        from bizinsight.mcp import BusinessMCPConnection
+
+        self._mcp_connection = BusinessMCPConnection.build(
+            scope=self.worker_name.value,
+            project_root=project_root,
+        )
+        return await self._mcp_connection.connect_to(self.toolkit)
+
+    async def close(self) -> None:
+        if self._mcp_connection is not None:
+            await self._mcp_connection.close()
 
     def _load_system_prompt(self) -> str:
         prompt_dir = Path(__file__).resolve().parents[1] / "prompts"
@@ -211,17 +236,42 @@ class WorkerBase(ABC):
                 ),
             }
 
-        def retrieve_internal_document(
+        async def retrieve_internal_document(
             query: str,
             top_k: int = 5,
         ) -> dict[str, Any]:
             """Retrieve traceable evidence from the internal document index."""
 
             result = self.knowledge_retriever.search(query, top_k=top_k)
+            if inspect.isawaitable(result):
+                result = await result
             return {
                 "query": result.query,
                 "evidence": [item.model_dump(mode="json") for item in result.evidence],
                 "reason": result.reason,
+            }
+
+        def analyze_business_segments(
+            dataset: str,
+            dimension: str,
+            period: str,
+            dimension_value: str | None = None,
+        ) -> dict[str, Any]:
+            """Analyze an authorized dataset by a controlled business dimension."""
+            self._require_dataset(dataset)
+            result = analyze_segments(
+                self.provider,
+                dataset=dataset,
+                dimension=dimension,
+                period=period,
+                dimension_value=dimension_value,
+            )
+            return {
+                "dataset": result.dataset,
+                "dimension": result.dimension,
+                "period": result.period,
+                "rows": list(result.rows),
+                "evidence": result.evidence.model_dump(mode="json"),
             }
 
         tools = [
@@ -255,6 +305,12 @@ class WorkerBase(ABC):
                 input_schema=_RetrievalInput,
                 is_read_only=True,
             ),
+            FunctionTool(
+                analyze_business_segments,
+                name="analyze_business_segments",
+                input_schema=_SegmentInput,
+                is_read_only=True,
+            ),
         ]
         return Toolkit(tools=tools)
 
@@ -280,6 +336,7 @@ class WorkerBase(ABC):
             ),
         )
         response = await self.agent.reply(message, structured_schema=Finding)
+        self.last_usage = response.usage
         if response.structured_output is None:
             raise WorkerOutputError(
                 f"{self.worker_name.value} failed to return a valid Finding "

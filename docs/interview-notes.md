@@ -37,3 +37,14 @@
 ### 最值得讲的失败与修复是什么？
 
 一开始最容易犯的错误是为了复用 Alias 而兼容旧接口。审计后我发现维护两套抽象会让系统复杂且难测，于是改为“职责迁移、代码重写”，并用结构化契约把各 Agent 解耦。这比简单复刻 Demo 更能体现工程判断。
+# BizInsight Agent 1.0 面试主线
+
+一句话：这是一个基于 AgentScope 2.0.7 的多智能体经营诊断系统，借鉴 Alias 的 Planner–Worker–Toolkit 分工，用新版公共 API 重构，并通过确定性工具、证据审查和单轮返工控制大模型幻觉。
+
+讲链路时按这个顺序：Leader 把自然语言问题转成带期间、维度和依赖的 `AnalysisPlan`；Workflow 并行调度领域 Worker；Worker 通过 AgentScope Toolkit 调用本地 RAG 和 Scoped MCP，不直接编造指标；Reviewer 从数据库复算并审查证据，问题只退回原 Worker 一次；通过的 Finding 才进入十一节报告。官方 Web UI、HTTP 和 CLI 最终都调用同一个 `run_analysis`。
+
+RAG 的重点不是“用了向量库”，而是为什么混合：BM25 擅长 CloudFlow v3.2、制度编号等精确词，Qwen embedding 擅长同义表达；AgentScope KnowledgeBase 管理 embedding 与 Qdrant，BizInsight 用 RRF 融合名次，避免把不同量纲的分数硬相加。向量失败会有事件并降级到 BM25。
+
+MCP 的重点是权限边界：每个 Worker 一个 AgentScope MCPClient/STDIO 子进程，角色 scope 固定在启动参数中；Server 只暴露五个业务只读工具，SQLite authorizer、表/指标 allowlist、单语句、超时和行数上限共同防止越权。
+
+测试策略：默认 Mock/离线测试真实跑 AgentScope 消息、结构化输出、Toolkit、MCPClient 和 KnowledgeBase 的代码路径，不联网、不花钱、结果可复现；真实百炼/Tavily/embedding 通过显式 online 命令单独做五次稳定性验收。
