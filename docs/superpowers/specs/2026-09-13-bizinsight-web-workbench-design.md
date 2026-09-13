@@ -191,7 +191,9 @@ FastAPI 在 `/` 提供工作台入口，并在受控前缀下托管打包进 `bi
 - `failed`：telemetry 存在该 Agent 且记录了错误，显示红色错误标识；
 - `not_called`：telemetry 没有该 Agent，显示灰色圆点和“本次未调用”，不得显示绿色对钩。
 
-节点摘要必须由 telemetry 中的事实生成：存在 `evidence:database` 时可写“已获取数据库证据”，存在 `evidence:document` 时可写“已检索文档证据”，存在 `evidence:web` 时可写“已获取外部证据”。数据库证据本身不能证明 MCP 被调用，因此不能据此显示“已调用 MCP”。无法从 telemetry 证明的工具和步骤一律不显示为已完成。
+节点的可选证据详情必须由 telemetry 中的事实生成：存在 `evidence:database` 时可写“已获取数据库证据”，存在 `evidence:document` 时可写“已检索文档证据”，存在 `evidence:web` 时可写“已获取外部证据”。数据库证据本身不能证明 MCP 被调用，因此不能据此显示“已调用 MCP”。无法从 telemetry 证明的工具和步骤一律不显示为已完成。
+
+流程卡片的主状态行以 telemetry 中的真实 `agent_name` 为准，不再使用证据类型作为主状态。卡片标题保留中文职责名，状态行规则如下：成功时显示绿色对钩和真实类名（例如 `FinanceSalesAgent`）；失败时显示红色标识和“`CustomerProductAgent（调用失败）`”；未调用时显示灰色圆点和“本次未调用”。证据类型继续保留在接口结构中，但不占用主状态行。
 
 响应同时返回每个已调用 Agent 的真实 `duration_ms` 和可证明的证据类型。顶部显示本次真实总耗时。底部四阶段只按真实产物点亮：存在 Leader 时点亮“规划任务”，存在任一 Worker 时点亮“调用工具”，存在 Reviewer 时点亮“审查证据”，存在受控 `report_url` 时点亮“生成报告”。缺失的阶段时间显示 `--:--`，不填造时间。
 
