@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+from agentscope.message import Usage
 from pydantic import BaseModel, Field, SecretStr, field_serializer
 
 
@@ -23,6 +24,41 @@ def _redact(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_redact(item) for item in value]
     return value
+
+
+def aggregate_agent_usage(agent: Any) -> Usage | None:
+    """Collect usage retained in AgentScope context for structured replies.
+
+    AgentScope 2.0.7 returns a synthetic final message after its structured
+    output tool succeeds. That message has no usage, while the model-call
+    messages kept in ``agent.state.context`` do. Sum those messages so callers
+    get the real usage for all ReAct and correction iterations.
+    """
+
+    state = getattr(agent, "state", None)
+    context = getattr(state, "context", ())
+    input_tokens = 0
+    output_tokens = 0
+    cache_input_tokens = 0
+    cache_creation_input_tokens = 0
+    found = False
+    for message in context:
+        usage = getattr(message, "usage", None)
+        if usage is None:
+            continue
+        found = True
+        input_tokens += usage.input_tokens
+        output_tokens += usage.output_tokens
+        cache_input_tokens += usage.cache_input_tokens
+        cache_creation_input_tokens += usage.cache_creation_input_tokens
+    if not found:
+        return None
+    return Usage(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_input_tokens=cache_input_tokens,
+        cache_creation_input_tokens=cache_creation_input_tokens,
+    )
 
 
 class ToolTelemetry(BaseModel):
@@ -69,4 +105,9 @@ class RunTelemetry(BaseModel):
         self.errors = list(errors)
 
 
-__all__ = ["AgentTelemetry", "RunTelemetry", "ToolTelemetry"]
+__all__ = [
+    "AgentTelemetry",
+    "RunTelemetry",
+    "ToolTelemetry",
+    "aggregate_agent_usage",
+]

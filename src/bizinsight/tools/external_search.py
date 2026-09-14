@@ -57,9 +57,16 @@ class ExternalSearchService:
                 else str(api_key)
             )
             try:
+                from functools import partial
+
+                import requests
                 from tavily import TavilyClient
 
-                self._client = TavilyClient(api_key=key)
+                session = requests.Session()
+                session.request = partial(  # type: ignore[method-assign]
+                    session.request, timeout=20
+                )
+                self._client = TavilyClient(api_key=key, session=session)
             except (ImportError, RuntimeError, ValueError) as exc:
                 self._client_error = f"Tavily 初始化失败：{exc}"
 

@@ -35,18 +35,18 @@ def create_mcp_server(*, scope: str, project_root: Path) -> FastMCP:
         if metric_name not in access["metrics"]:
             raise PermissionError(f"metric is outside {scope} scope: {metric_name}")
 
-    @server.tool()
+    @server.tool(annotations={"readOnlyHint": True})
     def list_business_datasets() -> dict[str, Any]:
         """List only the business datasets authorized for this Worker."""
         return {"scope": scope, "datasets": sorted(access["datasets"])}
 
-    @server.tool()
+    @server.tool(annotations={"readOnlyHint": True})
     def describe_business_dataset(dataset: str) -> dict[str, Any]:
         """Describe an authorized dataset without returning its full contents."""
         require_dataset(dataset)
         return provider.describe_schema(dataset)
 
-    @server.tool()
+    @server.tool(annotations={"readOnlyHint": True})
     def calculate_business_metric(metric_name: str, period: str) -> dict[str, Any]:
         """Calculate one allowlisted metric with reproducible evidence."""
         require_metric(metric_name)
@@ -56,7 +56,7 @@ def create_mcp_server(*, scope: str, project_root: Path) -> FastMCP:
             "evidence": [item.model_dump(mode="json") for item in result.evidence],
         }
 
-    @server.tool()
+    @server.tool(annotations={"readOnlyHint": True})
     def compare_business_periods(
         metric_name: str, current_period: str, comparison_period: str
     ) -> dict[str, Any]:
@@ -77,7 +77,7 @@ def create_mcp_server(*, scope: str, project_root: Path) -> FastMCP:
             else str(result.relative_change),
         }
 
-    @server.tool()
+    @server.tool(annotations={"readOnlyHint": True})
     def query_business_data(
         sql: str,
         parameters: list[str | int | float | bool | None] | None = None,

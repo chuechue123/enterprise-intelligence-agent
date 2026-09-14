@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from typing import Any
 
@@ -111,7 +110,8 @@ async def test_agent_returns_validated_structured_response_without_alias() -> No
 @pytest.mark.online
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    not os.getenv("DASHSCOPE_API_KEY") or not os.getenv("BIZINSIGHT_MODEL_NAME"),
+    not (settings := BizInsightSettings()).dashscope_api_key
+    or not settings.model_name,
     reason="explicit online smoke requires DashScope credentials and model name",
 )
 async def test_real_dashscope_structured_response() -> None:

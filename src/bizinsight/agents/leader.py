@@ -10,6 +10,7 @@ from agentscope.message import UserMsg
 from agentscope.model import ChatModelBase
 
 from bizinsight.data.provider import BusinessDataProvider
+from bizinsight.observability import aggregate_agent_usage
 from bizinsight.schemas import AnalysisContext, AnalysisPlan, AnalysisTask, WorkerName
 from bizinsight.time_periods import quarter_range, resolve_periods
 
@@ -97,7 +98,7 @@ class BizInsightLeader:
                 model=model,
                 react_config=ReActConfig(
                     max_iters=1,
-                    structured_output_grace_iters=1,
+                    structured_output_grace_iters=2,
                 ),
                 injection_config=InjectionConfig(inject_runtime_state=False),
             )
@@ -172,23 +173,28 @@ class BizInsightLeader:
             UserMsg(name="user", content=question),
             structured_schema=AnalysisPlan,
         )
-        self.last_usage = response.usage
+        self.last_usage = response.usage or aggregate_agent_usage(self.agent)
         if response.structured_output is None:
             return self.plan_offline(question)
         plan = AnalysisPlan.model_validate(response.structured_output)
         current = plan.current_period.quarter
         comparison = plan.comparison_period.quarter
-        tasks = [
-            task
-            if task.context is not None
-            else task.model_copy(
-                update={
-                    "context": AnalysisContext(
-                        current_period=current,
-                        comparison_period=comparison,
-                    )
-                }
-            )
-            for task in plan.tasks
-        ]
+        tasks = []
+        for task in plan.tasks:
+            config = DOMAIN_CONFIG[task.target_agent]
+            allowed = frozenset(config["datasets"])
+            required = [
+                name for name in task.required_datasets if name in allowed
+            ]
+            if not required:
+                # The model hallucinated dataset names; fall back to the
+                # Worker's full authorized list.
+                required = list(config["datasets"])
+            updates: dict[str, object] = {"required_datasets": required}
+            if task.context is None:
+                updates["context"] = AnalysisContext(
+                    current_period=current,
+                    comparison_period=comparison,
+                )
+            tasks.append(task.model_copy(update=updates))
         return plan.model_copy(update={"tasks": tasks})

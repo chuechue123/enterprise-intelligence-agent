@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
 
 from bizinsight.app import run_analysis
@@ -53,6 +54,11 @@ async def _main() -> None:
 
 
 def main() -> None:
+    # Windows consoles default to GBK; the JSON summary uses
+    # ensure_ascii=False and model-generated errors may contain emoji.
+    # Reconfigure stdout to UTF-8 so redirected output never fails on
+    # non-GBK characters.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     asyncio.run(_main())
 
 

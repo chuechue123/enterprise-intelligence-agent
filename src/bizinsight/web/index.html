@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>BizInsight Agent · 企业经营分析工作台</title>
+  <link rel="stylesheet" href="/bizinsight/assets/styles.css" />
+</head>
+
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="BizInsight Agent 首页">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-name">BizInsight Agent</span>
+    </a>
+    <div class="online-pill"><span class="status-dot"></span><span id="globalStatus">连接中</span></div>
+    <span class="top-divider"></span>
+    <span class="product-note">企业经营异常诊断智能体</span>
+  </header>
+
+  <div class="app-shell">
+    <nav class="sidebar" aria-label="主导航">
+      <button class="nav-item active" type="button" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5" />
+        </svg>
+        <span>分析工作台</span>
+      </button>
+      <button class="nav-item" type="button" data-scroll="reportPanel">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 15.5h6" />
+        </svg>
+        <span>报告预览</span>
+      </button>
+      <button class="nav-item" type="button" data-scroll="capabilityPanel">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M4.5 5.5A3.5 3.5 0 0 1 8 2h4v17H8a3.5 3.5 0 0 0-3.5 3zM19.5 5.5A3.5 3.5 0 0 0 16 2h-4v17h4a3.5 3.5 0 0 1 3.5 3z" />
+        </svg>
+        <span>知识库 / RAG</span>
+      </button>
+      <div class="sidebar-foot">
+        <span class="shield-mini"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M899.644952 166.424381L350.854095 705.987048 125.232762 495.079619c-68.303238-63.853714-171.166476 38.607238-102.64381 102.64381l278.235429 260.096c29.062095 27.172571 73.74019 28.42819 102.643809 0l598.820572-588.739048c66.840381-65.706667-35.876571-168.313905-102.64381-102.656z"
+              fill="#707070" />
+          </svg></span>
+        <p>只读数据访问<br />证据链路可追溯</p>
+      </div>
+    </nav>
+
+    <main class="workspace">
+      <section class="card ask-card" aria-labelledby="askTitle">
+        <div class="section-heading">
+          <span class="heading-icon chat-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M5 5h14v10H9l-4 4zM9 9h6M9 12h4" />
+            </svg>
+          </span>
+          <div>
+            <h1 id="askTitle">智能问答</h1>
+            <p>普通问答、知识检索与经营分析都在这里连续进行</p>
+          </div>
+        </div>
+
+        <div class="conversation-card" id="conversation" aria-live="polite">
+          <div class="conversation-empty message assistant" id="conversationEmpty">
+            <span class="message-avatar"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M512 127.0272c-133.4144 0-192.4864 72.1792-192.4864 192.4864V656.384h384.9856V319.5136c-0.0128-120.3072-78.72-192.4864-192.4992-192.4864z"
+                  fill="#A67C52" />
+                <path d="M560.128 487.9488h-96.256l-24.0512 96.2432v312.8064h144.3584V584.192z" fill="#DBB59A" />
+                <path
+                  d="M223.2576 704.4992c-45.2352 45.2352-48.128 192.4864-48.128 192.4864H512L415.7568 608.256s-169.8944 73.6256-192.4992 96.2432z m577.4848 0C778.112 681.8688 608.256 608.256 608.256 608.256L512 896.9984h336.8576s-2.88-147.264-48.1152-192.4992z"
+                  fill="#48A0DC" />
+                <path
+                  d="M584.1792 584.192L512 896.9984h24.064l72.1792-168.4352 120.3072-24.064-144.3712-120.3072z m-288.7296 120.3072l120.3072 24.064 72.1792 168.4352H512L439.8208 584.192l-144.3712 120.3072z"
+                  fill="#FFFFFF" />
+                <path
+                  d="M578.2144 270.976c-18.8288 41.6384-83.7888 72.6016-162.4576 72.6016h-47.7824c1.0496 47.1424 5.44 83.7248 23.7312 120.3072 24.064 48.128 73.1648 96.2432 120.3072 96.2432S608.256 512 632.32 463.8848c21.4272-42.8416 23.7696-85.696 24.0256-145.5232-1.4208-27.0464-52.48-47.3856-78.1312-47.3856z"
+                  fill="#F6CBAD" />
+                <path
+                  d="M723.6864 283.8912c-21.0176-75.904-107.8016-132.8-211.6864-132.8s-190.6688 56.896-211.6864 132.8c-16.0512 8.8064-28.928 21.504-28.928 35.6224v48.128c0 26.5728 45.6064 48.128 72.1792 48.128v-96.2432c0-66.4448 75.4048-120.3072 168.4352-120.3072s168.4352 53.8624 168.4352 120.3072v48.128c0 51.5712-32.448 95.552-78.0288 112.6656-6.4384-9.8816-17.5872-16.4224-30.2464-16.4224h-48.128c-19.9296 0-36.096 16.1664-36.096 36.096 0 19.9296 16.1664 36.096 36.096 36.096H572.16c3.52 0 6.912-0.512 10.1248-1.4464 70.9888-9.3312 128.0512-62.8608 142.6432-132.0576 15.4752-8.768 27.6992-21.1712 27.6992-34.9184v-48.128c-0.0128-14.144-12.8896-26.8416-28.9408-35.648z"
+                  fill="#4D4D4D" />
+              </svg></span>
+            <div class="message-body">
+              <div class="message-meta"><strong>BizInsight Agent</strong><span class="route-tag">准备就绪</span></div>
+              <p class="message-text">可以进行普通问答、企业知识检索、天气查询或经营异常诊断。</p>
+            </div>
+          </div>
+          <div class="message-list" id="messageList"></div>
+        </div>
+
+        <form id="chatForm">
+          <div class="composer-row">
+            <div class="composer">
+              <span class="paperclip" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M8 12.5 13.5 7a3 3 0 0 1 4.25 4.25l-7.5 7.5a5 5 0 0 1-7.07-7.07l8-8" />
+                </svg>
+              </span>
+              <label class="sr-only" for="question">请输入你的问题</label>
+              <input id="question" type="text" maxlength="8000" autocomplete="off" placeholder="输入你的问题..." />
+              <span class="composer-hint">Ctrl + Enter 快速发送</span>
+            </div>
+            <button class="send-button" id="sendButton" type="submit">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m5 4 15 8-15 8z" />
+              </svg>
+              <span>开始分析</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card process-card" aria-labelledby="processTitle">
+        <div class="process-head">
+          <div class="section-heading compact">
+            <span class="heading-icon route-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <circle cx="5" cy="12" r="2.5" />
+                <circle cx="12" cy="5" r="2.5" />
+                <circle cx="19" cy="12" r="2.5" />
+                <path d="m7 10 3-3M14 7l3 3M7.5 12h9M12 7.5v9" />
+                <circle cx="12" cy="19" r="2.5" />
+              </svg>
+            </span>
+            <div>
+              <h2 id="processTitle">分析执行流程</h2>
+              <p id="routeSummary">完成后将根据本次运行记录展示真实调用情况</p>
+            </div>
+          </div>
+          <span class="runtime-pill"><span class="clock">◷</span><span id="runtimeLabel">本次运行</span> <strong
+              id="timer">00:00</strong></span>
+        </div>
+
+        <div class="agent-flow" id="agentFlow">
+          <article class="agent-node" data-node="supervisor">
+            <span class="node-icon crown"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path d="M430.1 927.7h-278v-571l89 182.7z" fill="#F7BC3A" />
+                <path d="M524 245.3v683H227.8v-5.5h-0.1V555.6l0.1-0.1 92.7-97.1z" fill="#F7BC3A" />
+                <path d="M618.1 928.3h278.1v-571h-0.1L807.2 540z" fill="#E89E01" />
+                <path d="M522.4 245.2v683h296.2V555.5l-92.7-97.2z" fill="#E89E01" />
+                <path d="M522.8 452l-62.7 69.8 62.3 58.1 65.7-61.5z" fill="#900058" />
+                <path
+                  d="M916 782.1H140.7c-6.6 0-12-5.4-12-12v-4.6c0-6.6 5.4-12 12-12H916c6.6 0 12 5.4 12 12v4.6c0 6.6-5.4 12-12 12z"
+                  fill="#E8E8E8" />
+                <path d="M192 767.8m-14.3 0a14.3 14.3 0 1 0 28.6 0 14.3 14.3 0 1 0-28.6 0Z" fill="#BFBFBF" />
+                <path d="M320.1 768m-14.3 0a14.3 14.3 0 1 0 28.6 0 14.3 14.3 0 1 0-28.6 0Z" fill="#BFBFBF" />
+                <path d="M448.1 768m-14.3 0a14.3 14.3 0 1 0 28.6 0 14.3 14.3 0 1 0-28.6 0Z" fill="#BFBFBF" />
+                <path d="M576.1 768m-14.3 0a14.3 14.3 0 1 0 28.6 0 14.3 14.3 0 1 0-28.6 0Z" fill="#BFBFBF" />
+                <path d="M707.5 768m-14.3 0a14.3 14.3 0 1 0 28.6 0 14.3 14.3 0 1 0-28.6 0Z" fill="#BFBFBF" />
+                <path d="M834.1 767.8m-14.3 0a14.3 14.3 0 1 0 28.6 0 14.3 14.3 0 1 0-28.6 0Z" fill="#BFBFBF" />
+              </svg></span>
+            <div class="node-title"><strong>Leader</strong><small>意图路由</small></div>
+            <p class="node-state"><i></i><span>本次未调用</span></p>
+            <p class="node-desc">分析问题、规划任务、分配给专业 Agent</p>
+          </article>
+          <span class="flow-arrow">→</span>
+          <article class="agent-node" data-node="finance">
+            <span class="node-icon blue"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M113.664 602.112h81.92V921.6h-81.92zM345.088 499.712h81.92V921.6h-81.92zM576.512 562.176h81.92v358.4h-81.92zM807.936 379.904h81.92v540.672h-81.92z"
+                  fill="#437DFF" />
+                <path
+                  d="M175.104 537.6l-39.936-47.104 242.688-200.704 37.888-1.024 195.584 149.504L834.56 133.12l49.152 35.84-241.664 331.776-43.008 6.144-201.728-154.624z"
+                  fill="#63F7DE" />
+                <path d="M848.896 164.864m-61.44 0a61.44 61.44 0 1 0 122.88 0 61.44 61.44 0 1 0-122.88 0Z"
+                  fill="#63F7DE" />
+              </svg></span>
+            <div class="node-title"><strong>财务销售</strong><small>Worker</small></div>
+            <p class="node-state"><i></i><span>本次未调用</span></p>
+            <p class="node-desc">分析收入、毛利率等核心财务指标</p>
+          </article>
+          <span class="flow-arrow">→</span>
+          <article class="agent-node" data-node="customer">
+            <span class="node-icon violet"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M504.2 618c127.6-0.2 212.6-167.3 212.6-257.2 0-89.9-0.4-249.8-212.6-249.8S291.6 270.9 291.6 360.8s85 257.4 212.6 257.2z m361.9 126.8C812 703.3 655.8 634.3 655.8 634.3L554.4 817.9l-15-43.7 27.7-55.2-55.5-55.2-55.5 55.2 27.8 55.2L466 819l-98.6-184.6s-156.1 69-210.3 110.5C102.9 786.3 79 912.3 79 912.3h866.7s-15.8-118.6-79.6-167.5z"
+                  fill="#744CFF" />
+              </svg></span>
+            <div class="node-title"><strong>客户产品</strong><small>Worker</small></div>
+            <p class="node-state"><i></i><span>本次未调用</span></p>
+            <p class="node-desc">分析客户流失、产品使用情况</p>
+          </article>
+          <span class="flow-arrow">→</span>
+          <article class="agent-node" data-node="delivery">
+            <span class="node-icon mint"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M0 0m368.64 0l286.72 0q368.64 0 368.64 368.64l0 286.72q0 368.64-368.64 368.64l-286.72 0q-368.64 0-368.64-368.64l0-286.72q0-368.64 368.64-368.64Z"
+                  fill="#31C97B" />
+                <path
+                  d="M535.552 224.4608c0-12.9024-10.4448-23.552-23.552-23.552h-40.96c-12.9024 0-23.3472 10.4448-23.3472 23.552h-40.7552c-24.1664 0-44.4416 16.7936-47.7184 38.912h-71.8848c-22.528 0-40.7552 18.6368-40.7552 41.3696v441.1392c0 22.9376 18.2272 41.5744 40.7552 41.5744h241.4592a184.15616 184.15616 0 0 1-39.5264-114.4832c0-100.9664 80.2816-182.8864 179.2-182.8864 20.48 0 40.1408 3.6864 58.5728 10.0352v-195.3792c0-22.7328-18.2272-41.3696-40.5504-41.3696h-62.464c-3.4816-22.1184-23.552-38.912-47.9232-38.912h-40.5504z m-51.4048 23.552h14.7456c9.216 1.8432 17.2032 7.5776 21.9136 15.36 3.2768 5.3248 5.12 11.6736 5.12 18.2272 0 19.0464-15.36 34.6112-34.4064 34.6112-19.0464 0-34.4064-15.5648-34.4064-34.6112 0-4.096 0.6144-7.9872 2.048-11.6736 3.8912-11.0592 13.5168-19.456 24.9856-21.9136z m144.9984 171.2128H339.1488c-14.1312 0-25.8048-11.8784-25.8048-26.4192 0-14.5408 11.4688-26.4192 25.8048-26.4192h289.9968c14.336 0 26.0096 11.8784 26.0096 26.4192 0 14.5408-11.6736 26.4192-26.0096 26.4192z m-120.2176 129.4336h-169.7792c-14.1312 0-25.8048-11.6736-25.8048-26.4192 0-14.5408 11.4688-26.2144 25.8048-26.2144h169.5744c14.336 0 26.0096 11.8784 26.0096 26.2144 0 14.7456-11.6736 26.4192-25.8048 26.4192z m26.624 124.3136a141.33248 141.33248 0 0 1 282.624 0 141.33248 141.33248 0 0 1-282.624 0z m127.5904 67.3792l108.544-108.3392c7.168-7.3728 7.168-19.0464 0-26.4192a18.78016 18.78016 0 0 0-26.624 0l-95.0272 95.232-41.5744-41.5744a18.5344 18.5344 0 0 0-26.4192 0c-7.3728 7.3728-7.3728 19.0464 0 26.4192l54.6816 54.6816a18.59584 18.59584 0 0 0 26.4192 0z m-219.9552-62.0544h-104.0384c-14.336 0-25.8048-11.8784-25.8048-26.4192 0-14.5408 11.4688-26.2144 25.8048-26.2144h104.0384c14.1312 0 25.8048 11.6736 25.8048 26.2144 0 14.5408-11.6736 26.4192-25.8048 26.4192z"
+                  fill="#FFFFFF" />
+              </svg></span>
+            <div class="node-title"><strong>项目交付</strong><small>Worker</small></div>
+            <p class="node-state"><i></i><span>本次未调用</span></p>
+            <p class="node-desc">分析项目交付、验收情况与延期原因</p>
+          </article>
+          <span class="flow-arrow">→</span>
+          <article class="agent-node" data-node="external">
+            <span class="node-icon sky"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M512 1024a512 512 0 1 1 512-512 512 512 0 0 1-512 512z m0-960a448 448 0 1 0 448 448A448 448 0 0 0 512 64z"
+                  fill="#54C3F1" />
+                <path d="M480 64h64v896h-64z" fill="#54C3F1" />
+                <path
+                  d="M512 1024c-143.68 0-256-224-256-512s112.32-512 256-512 256 224 256 512-112.32 512-256 512z m0-960c-90.88 0-192 184-192 448s101.12 448 192 448 192-184 192-448-101.12-448-192-448z"
+                  fill="#54C3F1" />
+                <path d="M32 480h960v64H32zM96 256h832v64H96zM96 704h832v64H96z" fill="#54C3F1" />
+              </svg></span>
+            <div class="node-title"><strong>外部研究</strong><small>Tavily</small></div>
+            <p class="node-state"><i></i><span>本次未调用</span></p>
+            <p class="node-desc">补充行业对标、市场环境信息</p>
+          </article>
+          <span class="flow-arrow">→</span>
+          <article class="agent-node" data-node="reviewer">
+            <span class="node-icon purple"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M500.053333 643.413333a42.666667 42.666667 0 0 1-26.88-9.813333l-106.24-85.333333a42.666667 42.666667 0 0 1-5.973333-59.733334 42.666667 42.666667 0 0 1 60.16-5.973333l73.386667 60.16L640 366.506667a42.666667 42.666667 0 0 1 65.706667 54.613333l-170.666667 206.933333a42.666667 42.666667 0 0 1-34.986667 15.36z"
+                  fill="#9146d2" />
+                <path
+                  d="M532.053333 900.693333A42.666667 42.666667 0 0 1 512 896l-320-186.88a42.666667 42.666667 0 0 1-21.333333-37.12V264.106667a42.666667 42.666667 0 0 1 15.36-32.853334 42.666667 42.666667 0 0 1 34.986666-8.96 279.893333 279.893333 0 0 0 276.48-110.506666 42.666667 42.666667 0 0 1 69.12 0 277.333333 277.333333 0 0 0 224.426667 115.2 326.4 326.4 0 0 0 51.626667-4.693334 42.666667 42.666667 0 0 1 25.6 3.84 46.933333 46.933333 0 0 1 26.453333 39.68v408.746667a42.666667 42.666667 0 0 1-21.333333 37.12L554.666667 896a42.666667 42.666667 0 0 1-22.613334 4.693333zM256 647.68L532.48 810.666667 810.666667 649.813333V311.893333a361.386667 361.386667 0 0 1-277.333334-109.226666A361.813333 361.813333 0 0 1 256 311.893333z"
+                  fill="#9146d2" />
+              </svg></span>
+            <div class="node-title"><strong>证据审查</strong><small>Evidence Reviewer</small></div>
+            <p class="node-state"><i></i><span>本次未调用</span></p>
+            <p class="node-desc">交叉验证结果、形成最终信息</p>
+          </article>
+        </div>
+
+        <div class="timeline" aria-hidden="true">
+          <span class="timeline-point" data-phase="planned"><i></i><b>规划任务</b><small>--:--</small></span>
+          <span class="timeline-line"></span>
+          <span class="timeline-point" data-phase="workers"><i></i><b>调用工具</b><small>--:--</small></span>
+          <span class="timeline-line"></span>
+          <span class="timeline-point" data-phase="reviewed"><i></i><b>审查证据</b><small>--:--</small></span>
+          <span class="timeline-line"></span>
+          <span class="timeline-point" data-phase="report"><i></i><b>生成报告</b><small>--:--</small></span>
+        </div>
+      </section>
+    </main>
+
+    <aside class="report-column card" id="reportPanel" aria-labelledby="reportTitle">
+      <div class="report-head">
+        <div class="section-heading compact"><span class="heading-icon report-icon"><svg viewBox="0 0 1024 1024"
+              xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M728.3 928.2H297.9c-84.2 0-152.8-68.5-152.8-152.8V329.1c0-84.2 68.5-152.8 152.8-152.8H365v60h-67.1c-51.2 0-92.8 41.6-92.8 92.8v446.3c0 51.2 41.6 92.8 92.8 92.8h430.4c51.2 0 92.8-41.6 92.8-92.8V329.1c0-51.2-41.6-92.8-92.8-92.8H661v-60h67.3c84.2 0 152.8 68.5 152.8 152.8v446.3c0 84.3-68.6 152.8-152.8 152.8z"
+                fill="#515151" />
+              <path
+                d="M593.6 308.1h-161c-49.3 0-89.4-40.1-89.4-89.4v-31.4c0-49.3 40.1-89.4 89.4-89.4h161c49.3 0 89.4 40.1 89.4 89.4v31.4c0 49.3-40.1 89.4-89.4 89.4zM432.6 158c-16.2 0-29.4 13.2-29.4 29.4v31.4c0 16.2 13.2 29.4 29.4 29.4h161c16.2 0 29.4-13.2 29.4-29.4v-31.4c0-16.2-13.2-29.4-29.4-29.4h-161z"
+                fill="#515151" />
+              <path
+                d="M511.3 477.1H320.1c-16.6 0-30-13.4-30-30s13.4-30 30-30h191.3c16.6 0 30 13.4 30 30s-13.5 30-30.1 30zM576.1 604.1h-256c-16.6 0-30-13.4-30-30s13.4-30 30-30h256.1c16.6 0 30 13.4 30 30s-13.5 30-30.1 30zM640.1 732.1h-320c-16.6 0-30-13.4-30-30s13.4-30 30-30h320.1c16.6 0 30 13.4 30 30s-13.5 30-30.1 30z"
+                fill="#515151" />
+            </svg></span>
+          <div>
+            <h2 id="reportTitle">报告预览</h2>
+          </div>
+        </div>
+        <div class="format-toggle" aria-label="报告格式"><strong>HTML</strong></div>
+      </div>
+      <div class="report-empty" id="reportEmpty">
+        <span class="empty-report-icon"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M728.3 928.2H297.9c-84.2 0-152.8-68.5-152.8-152.8V329.1c0-84.2 68.5-152.8 152.8-152.8H365v60h-67.1c-51.2 0-92.8 41.6-92.8 92.8v446.3c0 51.2 41.6 92.8 92.8 92.8h430.4c51.2 0 92.8-41.6 92.8-92.8V329.1c0-51.2-41.6-92.8-92.8-92.8H661v-60h67.3c84.2 0 152.8 68.5 152.8 152.8v446.3c0 84.3-68.6 152.8-152.8 152.8z"
+              fill="#515151" />
+            <path
+              d="M593.6 308.1h-161c-49.3 0-89.4-40.1-89.4-89.4v-31.4c0-49.3 40.1-89.4 89.4-89.4h161c49.3 0 89.4 40.1 89.4 89.4v31.4c0 49.3-40.1 89.4-89.4 89.4zM432.6 158c-16.2 0-29.4 13.2-29.4 29.4v31.4c0 16.2 13.2 29.4 29.4 29.4h161c16.2 0 29.4-13.2 29.4-29.4v-31.4c0-16.2-13.2-29.4-29.4-29.4h-161z"
+              fill="#515151" />
+            <path
+              d="M511.3 477.1H320.1c-16.6 0-30-13.4-30-30s13.4-30 30-30h191.3c16.6 0 30 13.4 30 30s-13.5 30-30.1 30zM576.1 604.1h-256c-16.6 0-30-13.4-30-30s13.4-30 30-30h256.1c16.6 0 30 13.4 30 30s-13.5 30-30.1 30zM640.1 732.1h-320c-16.6 0-30-13.4-30-30s13.4-30 30-30h320.1c16.6 0 30 13.4 30 30s-13.5 30-30.1 30z"
+              fill="#515151" />
+          </svg></span>
+        <h3>尚未生成报告</h3>
+        <p>普通问答、知识检索和天气查询不会生成报告。发起经营分析后，审核通过的HTML报告将在这里显示。</p>
+      </div>
+      <div class="report-ready" id="reportReady" hidden>
+        <div class="report-meta"><span class="report-ok">✓</span>
+          <div><strong>经营诊断报告已生成</strong>
+            <p id="reportMeta">证据审核已完成</p>
+          </div>
+        </div>
+        <iframe id="reportFrame" title="BizInsight 经营诊断报告预览" sandbox="allow-same-origin"></iframe>
+        <a class="open-report" id="openReport" href="#" target="_blank" rel="noopener"><span>↗</span> 打开完整报告</a>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/bizinsight/assets/app.js" defer></script>
+</body>
+
+</html>

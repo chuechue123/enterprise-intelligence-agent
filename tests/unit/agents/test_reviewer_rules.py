@@ -110,6 +110,25 @@ def test_correct_reproducible_metric_is_accepted(
     assert result.accepted_finding_ids == ["FINDING-renewal-review"]
 
 
+def test_unregistered_metric_revision_tells_worker_to_remove_it(
+    provider: BusinessDataProvider,
+) -> None:
+    finding = _metric_finding(Decimal("1"))
+    finding.metrics[0].metric_name = "invented_metric"
+
+    result = EvidenceReviewerAgent(provider=provider).review(
+        [finding],
+        owners={finding.finding_id: WorkerName.CUSTOMER_PRODUCT},
+    )
+
+    request = result.revision_requests[0]
+    assert "2026-Q2" in request.reason
+    assert request.required_changes == [
+        "从 metrics 中删除未注册指标 invented_metric；"
+        "只保留系统提示列出的授权指标"
+    ]
+
+
 def test_unsupported_certain_claim_without_evidence_is_rejected(
     provider: BusinessDataProvider,
 ) -> None:

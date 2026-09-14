@@ -103,3 +103,22 @@ async def test_external_agent_returns_finding_and_supports_offline_research() ->
     assert "不能直接证明" in (finding.causal_assessment or "")
     assert agent.tool_names == {"search_external_information"}
     assert model.call_count == 1
+
+
+def test_external_fallback_finding_preserves_searched_evidence() -> None:
+    service = ExternalSearchService(fallback_dir=FALLBACK_DIR, api_key=None)
+    result = service.search("企业软件行业背景", max_results=2)
+    task = AnalysisTask(
+        task_id="TASK-EXTERNAL-FALLBACK",
+        target_agent=WorkerName.EXTERNAL_RESEARCH,
+        question="检索企业软件行业背景。",
+        required_datasets=["external_information"],
+        expected_outputs=["带来源的行业背景"],
+    )
+
+    finding = ExternalResearchAgent._fallback_finding(task, result)
+
+    assert finding.evidence == result.evidence
+    assert finding.is_key is False
+    assert finding.metrics == []
+    assert "不能单独证明" in (finding.causal_assessment or "")

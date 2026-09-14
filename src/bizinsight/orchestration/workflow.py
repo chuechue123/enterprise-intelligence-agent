@@ -52,6 +52,9 @@ class WorkflowResult:
 
 EventSink = Callable[[CustomEvent], Awaitable[None] | None]
 
+# Live web research needs more time than deterministic internal analysis.
+WORKER_TIMEOUT_SECONDS = {WorkerName.EXTERNAL_RESEARCH: 120.0}
+
 
 class AnalysisWorkflow:
     """Execute ready tasks concurrently and isolate failures per Worker."""
@@ -60,7 +63,7 @@ class AnalysisWorkflow:
         self,
         workers: Mapping[WorkerName, WorkerProtocol],
         *,
-        worker_timeout_seconds: float = 30,
+        worker_timeout_seconds: float = 300,
         event_sink: EventSink | None = None,
     ) -> None:
         if worker_timeout_seconds <= 0:
@@ -103,9 +106,12 @@ class AnalysisWorkflow:
         await self._emit("task_started", task)
         started = time.monotonic()
         try:
+            timeout = WORKER_TIMEOUT_SECONDS.get(
+                task.target_agent, self.worker_timeout_seconds
+            )
             finding = await asyncio.wait_for(
                 worker.analyze(task),
-                timeout=self.worker_timeout_seconds,
+                timeout=timeout,
             )
         except TimeoutError:
             duration = (time.monotonic() - started) * 1_000

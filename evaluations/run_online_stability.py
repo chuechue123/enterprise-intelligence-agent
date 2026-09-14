@@ -1,17 +1,33 @@
-"""Explicit five-run stability harness for the real AgentScope pipeline."""
+"""Explicit five-run stability harness for the real AgentScope pipeline.
+
+Each round runs in its own process through the CLI, mirroring real usage
+and isolating anyio/MCP cleanup side effects between rounds.
+"""
 
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
-from bizinsight.app import run_analysis
-from bizinsight.config import BizInsightSettings
+
+def _load_dotenv_values(root: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    dotenv_path = root / ".env"
+    if not dotenv_path.exists():
+        return values
+    for line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, value = line.partition("=")
+            values[key.strip()] = value.strip()
+    return values
 
 
-async def main() -> None:
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument(
@@ -19,34 +35,53 @@ async def main() -> None:
         default="综合分析公司2026年第二季度经营表现下降的主要原因",
     )
     args = parser.parse_args()
-    settings = BizInsightSettings()
-    settings.require_online_model()
     root = Path(__file__).resolve().parents[1]
     print(f"Explicit online stability run count: {args.runs}")
+    env = os.environ.copy()
+    env.update(_load_dotenv_values(root))
     records = []
     for index in range(1, args.runs + 1):
-        try:
-            result = await run_analysis(
+        output_dir = root / f"outputs/online-stability/run-{index}"
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "bizinsight.cli",
+                "--question",
                 args.question,
-                project_root=root,
-                output_dir=root / f"outputs/online-stability/run-{index}",
-                session_id=f"stability-{index}",
-                settings=settings,
-                mode="online",
+                "--mode",
+                "online",
+                "--output-dir",
+                str(output_dir),
+                "--session-id",
+                f"stability-{index}",
+                "--project-root",
+                str(root),
+            ],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        record: dict = {
+            "run": index,
+            "success": proc.returncode == 0,
+            "returncode": proc.returncode,
+        }
+        telemetry_files = sorted(output_dir.glob("*.telemetry.json"))
+        if telemetry_files:
+            record["telemetry"] = json.loads(
+                telemetry_files[-1].read_text(encoding="utf-8")
             )
-            records.append(
-                {
-                    "run": index,
-                    "success": True,
-                    "finding_count": len(result.findings),
-                    "accepted_count": len(result.review.accepted_finding_ids),
-                    "telemetry": result.telemetry.model_dump(mode="json"),
-                }
+        if proc.returncode != 0:
+            record["stderr_tail"] = proc.stderr[-2000:]
+        records.append(record)
+        print(
+            json.dumps(
+                {"run": index, "success": proc.returncode == 0},
+                ensure_ascii=False,
             )
-        except Exception as exc:
-            records.append(
-                {"run": index, "success": False, "error_type": type(exc).__name__}
-            )
+        )
     success_rate = sum(item["success"] for item in records) / args.runs
     summary = {"runs": args.runs, "success_rate": success_rate, "records": records}
     output = root / "outputs/online-stability/summary.json"
@@ -60,4 +95,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

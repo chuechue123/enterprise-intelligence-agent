@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,4 +53,16 @@ class BusinessMCPConnection:
         return selected
 
     async def close(self) -> None:
-        await self.client.close()
+        try:
+            await self.client.close()
+        except asyncio.CancelledError:
+            # AgentScope's MCPClient.close() only guards with
+            # `except Exception`, but the anyio stdio task group raises
+            # CancelledError from an internal cancel scope when its worker
+            # thread exits. In the cleanup path this is the only plausible
+            # source: genuine external cancellation would have aborted
+            # `run_analysis` at an earlier await point. Reset the pending
+            # cancellation so the caller can finish cleanup normally.
+            task = asyncio.current_task()
+            if task is not None:
+                task.uncancel()

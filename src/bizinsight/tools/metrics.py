@@ -15,7 +15,7 @@ RATIO_PRECISION = Decimal("0.000001")
 METRIC_QUERIES = {
     "revenue": """
         SELECT
-            COALESCE(SUM(recognized_revenue), 0) AS numerator,
+            SUM(recognized_revenue) AS numerator,
             NULL AS denominator
         FROM contracts
         WHERE recognition_quarter = ?
@@ -30,13 +30,16 @@ METRIC_QUERIES = {
     """,
     "renewal_rate": """
         SELECT
-            SUM(
+            COALESCE(SUM(
                 CASE
                     WHEN due_for_renewal = 1 AND renewal_status = 'renewed'
                     THEN 1 ELSE 0
                 END
-            ) AS numerator,
-            SUM(CASE WHEN due_for_renewal = 1 THEN 1 ELSE 0 END) AS denominator
+            ), 0) AS numerator,
+            COALESCE(
+                SUM(CASE WHEN due_for_renewal = 1 THEN 1 ELSE 0 END),
+                0
+            ) AS denominator
         FROM subscriptions
         WHERE quarter = ?
     """,
@@ -110,6 +113,10 @@ def calculate_metric(
     if not query_result.rows:
         raise MetricUnavailableError(f"no data returned for {metric_name} in {period}")
     row = query_result.rows[0]
+    if row["numerator"] is None:
+        # An aggregate over zero matching rows yields NULL; report the
+        # metric as unavailable instead of fabricating a zero value.
+        raise MetricUnavailableError(f"no data returned for {metric_name} in {period}")
     numerator = _decimal(row["numerator"])
     denominator_value = row["denominator"]
     denominator = None if denominator_value is None else _decimal(denominator_value)

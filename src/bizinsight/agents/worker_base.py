@@ -9,16 +9,17 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from agentscope.agent import Agent, InjectionConfig, ReActConfig
-from agentscope.message import UserMsg
+from agentscope.message import ToolResultBlock, Usage, UserMsg
 from agentscope.model import ChatModelBase
 from agentscope.tool import FunctionTool, Toolkit
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from bizinsight.data.provider import (
     BusinessDataProvider,
     DatasetAccessError,
     QueryResult,
 )
+from bizinsight.observability import aggregate_agent_usage
 from bizinsight.schemas import AnalysisTask, Finding, WorkerName
 from bizinsight.tools.knowledge import KnowledgeRetriever
 from bizinsight.tools.metrics import (
@@ -32,7 +33,7 @@ ScalarParameter = str | int | float | bool | None
 
 
 class WorkerOutputError(RuntimeError):
-    """Raised when a Worker cannot produce a valid Finding in two iterations."""
+    """Raised when a Worker cannot produce a valid Finding after recovery."""
 
 
 class _DatasetInput(BaseModel):
@@ -105,23 +106,99 @@ class WorkerBase(ABC):
     ) -> None:
         self.provider = provider
         self.knowledge_retriever = knowledge_retriever
+        self._model = model
+        self._system_prompt = self._load_system_prompt()
         self.last_usage = None
+        self.last_output_attempts = 0
+        self.last_output_error: str | None = None
         self.toolkit = self._build_toolkit()
         self.tool_names = {
             tool.name for group in self.toolkit.tool_groups for tool in group.tools
         }
-        self.agent = Agent(
+        self.agent = self._build_agent()
+        self._mcp_connection = None
+
+    def _build_agent(self) -> Agent:
+        """Create a Worker agent with a fresh conversation context."""
+
+        return Agent(
             name=self.worker_name.value,
-            system_prompt=self._load_system_prompt(),
-            model=model,
+            system_prompt=self._system_prompt,
+            model=self._model,
             toolkit=self.toolkit,
             react_config=ReActConfig(
-                max_iters=1,
-                structured_output_grace_iters=1,
+                max_iters=3,
+                structured_output_grace_iters=2,
             ),
             injection_config=InjectionConfig(inject_runtime_state=False),
         )
-        self._mcp_connection = None
+
+    @staticmethod
+    def _merge_usage(*items: Usage | None) -> Usage | None:
+        available = [item for item in items if item is not None]
+        if not available:
+            return None
+        return Usage(
+            input_tokens=sum(item.input_tokens for item in available),
+            output_tokens=sum(item.output_tokens for item in available),
+            cache_input_tokens=sum(
+                item.cache_input_tokens for item in available
+            ),
+            cache_creation_input_tokens=sum(
+                item.cache_creation_input_tokens for item in available
+            ),
+        )
+
+    @staticmethod
+    def _structured_output_error(agent: Agent) -> str:
+        """Return the last safe schema error retained by AgentScope."""
+
+        state = getattr(agent, "state", None)
+        context = getattr(state, "context", ())
+        for message in reversed(context):
+            for block in reversed(getattr(message, "content", ())):
+                if not isinstance(block, ToolResultBlock):
+                    continue
+                if block.name != "GenerateStructuredOutput":
+                    continue
+                if block.state != "error":
+                    continue
+                if isinstance(block.output, str):
+                    detail = block.output
+                else:
+                    detail = " ".join(
+                        item.text
+                        for item in block.output
+                        if getattr(item, "type", None) == "text"
+                    )
+                detail = " ".join(detail.split())
+                if detail:
+                    return detail[:500]
+        return "AgentScope exhausted structured-output iterations"
+
+    async def _request_finding(
+        self,
+        agent: Agent,
+        message: UserMsg,
+    ) -> tuple[Finding | None, Usage | None, str | None]:
+        """Run one independent AgentScope attempt."""
+
+        response = await agent.reply(message, structured_schema=Finding)
+        usage = response.usage or aggregate_agent_usage(agent)
+        if response.structured_output is None:
+            return None, usage, self._structured_output_error(agent)
+        try:
+            return Finding.model_validate(response.structured_output), usage, None
+        except ValueError as exc:
+            if isinstance(exc, ValidationError):
+                detail = "; ".join(
+                    f"{'.'.join(str(part) for part in item['loc'])}: "
+                    f"{item['msg']}"
+                    for item in exc.errors()
+                )
+            else:
+                detail = type(exc).__name__
+            return None, usage, detail[:500]
 
     async def attach_business_mcp(self, project_root: Path) -> list[str]:
         """Add scoped MCP tools through AgentScope without changing local logic."""
@@ -328,26 +405,41 @@ class WorkerBase(ABC):
                 f"{self.worker_name.value} cannot access required datasets: {names}",
             )
 
-        message = UserMsg(
-            name="BizInsightLeader",
-            content=(
-                "执行以下经营分析任务，并返回一个带可复算证据的 Finding：\n"
-                f"{task.model_dump_json(indent=2)}"
-            ),
-        )
-        response = await self.agent.reply(message, structured_schema=Finding)
-        self.last_usage = response.usage
-        if response.structured_output is None:
-            raise WorkerOutputError(
-                f"{self.worker_name.value} failed to return a valid Finding "
-                "after one correction opportunity",
+        self.last_usage = None
+        self.last_output_attempts = 0
+        self.last_output_error = None
+
+        for attempt in range(1, 3):
+            if attempt == 2:
+                self.agent = self._build_agent()
+            recovery_note = (
+                "\n这是一次独立恢复重试。请重新核验所需证据，并严格调用 "
+                "GenerateStructuredOutput 返回完整 Finding。"
+                if attempt == 2
+                else ""
             )
-        try:
-            return Finding.model_validate(response.structured_output)
-        except ValueError as exc:
-            raise WorkerOutputError(
-                f"{self.worker_name.value} returned an invalid Finding",
-            ) from exc
+            message = UserMsg(
+                name="BizInsightLeader",
+                content=(
+                    "执行以下经营分析任务，并返回一个带可复算证据的 Finding：\n"
+                    f"{task.model_dump_json(indent=2)}{recovery_note}"
+                ),
+            )
+            finding, usage, error = await self._request_finding(
+                self.agent,
+                message,
+            )
+            self.last_output_attempts = attempt
+            self.last_usage = self._merge_usage(self.last_usage, usage)
+            self.last_output_error = error
+            if finding is not None:
+                return finding
+
+        raise WorkerOutputError(
+            f"{self.worker_name.value} failed to return a valid Finding "
+            f"after {self.last_output_attempts} independent attempts; "
+            f"last structured-output error: {self.last_output_error}",
+        )
 
 
 __all__ = ["DatasetAccessError", "WorkerBase", "WorkerOutputError"]

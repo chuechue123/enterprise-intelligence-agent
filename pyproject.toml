@@ -23,8 +23,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-research = ["tavily-python>=0.7,<1"]
-service = ["agentscope[service]==2.0.7", "redis>=5,<7"]
+research = ["tavily-python>=0.7,<1", "requests>=2.31"]
+service = [
+    "agentscope[service,storage-sql]==2.0.7",
+    "aiosqlite>=0.20,<1",
+]
+service-redis = ["redis>=5,<7"]
 dev = [
     "pytest>=8.3,<9",
     "pytest-asyncio>=0.25,<1",
@@ -35,11 +39,17 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-bizinsight = ["prompts/*.md", "templates/*.j2"]
+bizinsight = [
+    "prompts/*.md",
+    "templates/*.j2",
+    "web/*.html",
+    "web/*.css",
+    "web/*.js",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not online'"
+addopts = "-m 'not online' --basetemp=.pytest-tmp"
 markers = [
     "smoke: minimal integration smoke tests",
     "online: tests that call external services and require credentials",

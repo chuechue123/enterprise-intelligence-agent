@@ -106,5 +106,26 @@ def test_unknown_metric_and_invalid_period_are_rejected(
         calculate_metric(provider, "revenue", "Q2")
 
 
+@pytest.mark.parametrize(
+    "metric_name",
+    [
+        "revenue",
+        "gross_margin",
+        "renewal_rate",
+        "on_time_acceptance_rate",
+        "win_rate",
+    ],
+)
+def test_metric_with_no_data_raises_instead_of_fabricating_zero(
+    provider: BusinessDataProvider,
+    metric_name: str,
+) -> None:
+    # 2025-Q1 predates the synthetic dataset (2025-Q3..2026-Q2); a metric
+    # queried there must be reported as unavailable, never as 0 with a
+    # CALCULATION evidence that would pass reviewer recalculation.
+    with pytest.raises(metrics.MetricUnavailableError):
+        calculate_metric(provider, metric_name, "2025-Q1")
+
+
 def test_runtime_metric_code_never_reads_evaluation_ground_truth() -> None:
     assert "ground_truth" not in inspect.getsource(metrics)

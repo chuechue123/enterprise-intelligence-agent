@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
-import socket
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,6 +53,12 @@ def build_dashscope_model(settings: BizInsightSettings) -> DashScopeChatModel:
         credential=credential,
         model=settings.model_name,
         stream=False,
+        parameters=DashScopeChatModel.Parameters(
+            # 复杂 Finding 的 JSON 输出常超过 API 默认 4096 上限而被截断，
+            # 显式放宽到 8192 并允许并行工具调用。
+            max_tokens=8192,
+            parallel_tool_calls=True,
+        ),
     )
 
 
@@ -115,11 +121,6 @@ def health_status(
     knowledge = project_root / "data/knowledge/index.json"
     fallback = project_root / "data/knowledge/external_fallback/index.json"
     vector_manifest = project_root / "data/knowledge/vector/manifest.json"
-    try:
-        with socket.create_connection(("127.0.0.1", 6379), timeout=0.05):
-            redis_status = "available"
-    except OSError:
-        redis_status = "unavailable"
     return {
         "status": "ok" if database.is_file() and knowledge.is_file() else "degraded",
         "database": "available" if database.is_file() else "missing",
@@ -128,7 +129,11 @@ def health_status(
         if vector_manifest.is_file()
         else "bm25_only",
         "business_mcp": "enabled" if settings.enable_business_mcp else "disabled",
-        "redis": redis_status,
+        "weather_mcp": "enabled",
+        "service_storage": settings.service_storage_backend,
+        "redis": "required"
+        if settings.service_storage_backend == "redis"
+        else "not_required",
         "model": "configured"
         if settings.dashscope_api_key and settings.model_name
         else "offline",
@@ -272,15 +277,41 @@ async def run_analysis(
     async def revise(request):
         task = tasks_by_finding[request.finding_id]
         worker = workers[request.target_agent]
+        allowed = getattr(worker, "allowed_metrics", ())
+        metric_guardrail = (
+            f"你的授权指标只有：{', '.join(sorted(allowed))}。"
+            "metrics 数组只能使用这些名称，删除被点名指标后不得新增"
+            "任何其他指标名。"
+            if allowed
+            else "你不使用任何 metrics 指标，不得新增 metrics 数组内容。"
+        )
         revised_task = task.model_copy(
             update={
                 "question": (
                     f"{task.question}\n\nReviewer 定向返工：{request.reason}\n"
-                    f"必须修改：{'；'.join(request.required_changes)}"
+                    f"必须修改：{'；'.join(request.required_changes)}\n"
+                    f"{metric_guardrail}\n"
+                    "返工只此一次，请同步全面复查：fact_statement、"
+                    "business_interpretation 与 causal_assessment 中的每个数字、"
+                    "指标和归因都必须有已附加证据支撑；无证据的表述一律删除，"
+                    "或改写为待验证假设并写入 limitations。"
                 )
             }
         )
-        return await worker.analyze(revised_task)
+        try:
+            return await worker.analyze(revised_task)
+        except Exception as exc:
+            # review_loop swallows exceptions from revise; record them so a
+            # failed revision is never silent.
+            telemetry.record_event(
+                {
+                    "event": "revision_failed",
+                    "finding_id": request.finding_id,
+                    "target_agent": request.target_agent.value,
+                    "error_type": type(exc).__name__,
+                }
+            )
+            raise
 
     cycle = await run_review_cycle(
         findings,
@@ -298,8 +329,23 @@ async def run_analysis(
             {"event": "revision_round", "count": cycle.revision_count}
         )
     telemetry.record_event({"event": "final_review", "status": review.status.value})
-    for worker in mcp_workers:
-        await worker.close()
+    # AgentScope stateful stdio clients enter nested anyio cancel scopes in
+    # this task. They must leave those scopes in LIFO order.
+    for worker in reversed(mcp_workers):
+        try:
+            await worker.close()
+        except asyncio.CancelledError:
+            # Real cancellation must propagate; cleanup noise was already
+            # handled inside BusinessMCPConnection.close().
+            raise
+        except Exception as exc:
+            telemetry.record_event(
+                {
+                    "event": "mcp_close_error",
+                    "worker": getattr(worker, "worker_name", type(worker).__name__),
+                    "error": str(exc),
+                }
+            )
     if vector_index is not None:
         await vector_index.__aexit__(None, None, None)
     actions = (
@@ -396,7 +442,9 @@ async def run_analysis(
         telemetry.agents.append(
             AgentTelemetry(
                 agent_name=name,
-                model_name=(settings.model_name or "deterministic"),
+                model_name=(settings.model_name or "unknown")
+                if mode == "online"
+                else "deterministic",
                 input_tokens=getattr(usage, "input_tokens", 0),
                 output_tokens=getattr(usage, "output_tokens", 0),
             )
@@ -430,7 +478,7 @@ def create_agent_service(project_root: Path | None = None):
     try:
         from agentscope.app import create_app
         from agentscope.app.message_bus import InMemoryMessageBus
-        from agentscope.app.storage import RedisStorage
+        from agentscope.app.storage import AsyncSQLAlchemyStorage, RedisStorage
         from agentscope.app.workspace_manager import LocalWorkspaceManager
     except ImportError as exc:
         raise RuntimeError(
@@ -441,8 +489,17 @@ def create_agent_service(project_root: Path | None = None):
     from bizinsight.agents.service_agent import BizInsightServiceAgent
 
     BizInsightServiceAgent.configure(project_root=root)
+    settings = BizInsightSettings()
+    if settings.service_storage_backend == "redis":
+        storage = RedisStorage(host="localhost", port=6379)
+    else:
+        service_data = root / "outputs/service"
+        service_data.mkdir(parents=True, exist_ok=True)
+        database_path = (service_data / "agentscope.db").as_posix()
+        database_url = f"sqlite+aiosqlite:///{database_path}"
+        storage = AsyncSQLAlchemyStorage(database_url)
     app = create_app(
-        storage=RedisStorage(host="localhost", port=6379),
+        storage=storage,
         message_bus=InMemoryMessageBus(),
         workspace_manager=LocalWorkspaceManager(
             basedir=str(root / "outputs/workspaces")
@@ -474,4 +531,7 @@ def create_agent_service(project_root: Path | None = None):
         "/bizinsight/health", lambda: health_status(root), methods=["GET"]
     )
     app.add_api_route("/bizinsight/analyze", analyze, methods=["POST"])
+    from bizinsight.web import attach_web_workbench
+
+    attach_web_workbench(app, project_root=root)
     return app

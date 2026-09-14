@@ -4,6 +4,7 @@ from bizinsight.agents.customer_product import CustomerProductAgent
 from bizinsight.agents.delivery import DeliveryAgent
 from bizinsight.agents.finance_sales import FinanceSalesAgent
 from bizinsight.agents.reviewer import EvidenceReviewerAgent
+from bizinsight.agents.supervisor import SupervisorAgent
 from bizinsight.agents.worker_base import WorkerBase, WorkerOutputError
 
 __all__ = [
@@ -11,6 +12,7 @@ __all__ = [
     "DeliveryAgent",
     "FinanceSalesAgent",
     "EvidenceReviewerAgent",
+    "SupervisorAgent",
     "WorkerBase",
     "WorkerOutputError",
 ]

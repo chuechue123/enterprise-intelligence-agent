@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -45,6 +47,10 @@ class BizInsightSettings(BaseSettings):
     enable_business_mcp: bool = Field(
         default=True,
         validation_alias="BIZINSIGHT_ENABLE_BUSINESS_MCP",
+    )
+    service_storage_backend: Literal["sqlite", "redis"] = Field(
+        default="sqlite",
+        validation_alias="BIZINSIGHT_SERVICE_STORAGE",
     )
 
     @field_validator(

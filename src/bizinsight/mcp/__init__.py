@@ -2,5 +2,6 @@
 
 from bizinsight.mcp.client import BusinessMCPConnection
 from bizinsight.mcp.contracts import MCP_SCOPES
+from bizinsight.mcp.weather_client import WeatherMCPConnection
 
-__all__ = ["BusinessMCPConnection", "MCP_SCOPES"]
+__all__ = ["BusinessMCPConnection", "MCP_SCOPES", "WeatherMCPConnection"]

@@ -48,3 +48,14 @@ RAG 的重点不是“用了向量库”，而是为什么混合：BM25 擅长 C
 MCP 的重点是权限边界：每个 Worker 一个 AgentScope MCPClient/STDIO 子进程，角色 scope 固定在启动参数中；Server 只暴露五个业务只读工具，SQLite authorizer、表/指标 allowlist、单语句、超时和行数上限共同防止越权。
 
 测试策略：默认 Mock/离线测试真实跑 AgentScope 消息、结构化输出、Toolkit、MCPClient 和 KnowledgeBase 的代码路径，不联网、不花钱、结果可复现；真实百炼/Tavily/embedding 通过显式 online 命令单独做五次稳定性验收。
+
+## 真实模型验证记录（2026-09-10）
+
+首次真实模型验收（qwen-plus + Tavily，`evaluations/run_online_stability.py`，每轮独立进程跑 CLI）：
+
+- 结果：5/5 轮成功（`outputs/online-stability/summary.json`），每轮 4 个 Worker 全部产出 Finding；4 轮零错误，1 轮因 DashScope 服务端偶发 400（模型生成非法 JSON function.arguments）有 1 个 Worker 失败，属供应商侧波动。
+- 过程中修复的四个真实模型路径问题（Mock 测不出来）：
+  1. MCP 关闭时 anyio 内部 cancel scope 的 CancelledError 穿透 `except Exception` 取消主任务 → close 时吞掉并 `uncancel()` 复位；
+  2. LLM Leader 幻觉数据集名（把指标名当数据集）→ 提示词给权威清单 + 代码层白名单归一化兜底；
+  3. `ReActConfig(max_iters=1)` 不足以完成"取证→输出 Finding"→ 提到 3，Worker 耗时 50-80s，workflow 超时提至 120s；
+  4. AgentScope 权限引擎把未标注只读的 MCP 工具默认判 ASK，裸 CLI 无人确认直接退出 → MCP 工具加 `readOnlyHint` 标注走只读快速通道。

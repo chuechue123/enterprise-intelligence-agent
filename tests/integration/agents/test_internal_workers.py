@@ -299,7 +299,7 @@ async def test_agentscope_executes_scoped_tool_before_structured_finding(
 
 
 @pytest.mark.asyncio
-async def test_invalid_structured_output_gets_only_one_correction_attempt(
+async def test_invalid_structured_output_succeeds_on_correction_attempt(
     provider: BusinessDataProvider,
     retriever: KnowledgeRetriever,
 ) -> None:
@@ -321,7 +321,36 @@ async def test_invalid_structured_output_gets_only_one_correction_attempt(
 
     assert finding.finding_id == "FINDING-CORRECTED-001"
     assert model.call_count == 2
-    assert worker.agent.react_config.structured_output_grace_iters == 1
+    assert worker.agent.react_config.structured_output_grace_iters == 2
+
+
+@pytest.mark.asyncio
+async def test_worker_recovers_with_one_fresh_agent_attempt(
+    provider: BusinessDataProvider,
+    retriever: KnowledgeRetriever,
+) -> None:
+    model = _WorkerMockModel(
+        [
+            *[{"finding_id": "invalid"} for _ in range(5)],
+            _finding_payload("FINDING-RECOVERED-001"),
+        ],
+    )
+    worker = FinanceSalesAgent(
+        model=model,
+        provider=provider,
+        knowledge_retriever=retriever,
+    )
+    first_agent = worker.agent
+
+    finding = await worker.analyze(
+        _task(WorkerName.FINANCE_SALES, ["contracts"]),
+    )
+
+    assert finding.finding_id == "FINDING-RECOVERED-001"
+    assert model.call_count == 6
+    assert worker.last_output_attempts == 2
+    assert worker.last_output_error is None
+    assert worker.agent is not first_agent
 
 
 @pytest.mark.asyncio
@@ -383,7 +412,7 @@ def test_workers_expose_no_general_file_or_ground_truth_tool(
 
 
 @pytest.mark.asyncio
-async def test_worker_raises_when_both_structured_attempts_are_invalid(
+async def test_worker_raises_when_all_structured_attempts_are_invalid(
     provider: BusinessDataProvider,
     retriever: KnowledgeRetriever,
 ) -> None:
@@ -394,9 +423,15 @@ async def test_worker_raises_when_both_structured_attempts_are_invalid(
         knowledge_retriever=retriever,
     )
 
-    with pytest.raises(WorkerOutputError):
+    with pytest.raises(
+        WorkerOutputError,
+        match=r"after 2 independent attempts.*title.*required",
+    ):
         await worker.analyze(
             _task(WorkerName.FINANCE_SALES, ["contracts"]),
         )
 
-    assert model.call_count == 2
+    assert model.call_count == 10
+    assert worker.last_output_attempts == 2
+    assert worker.last_output_error is not None
+    assert "title" in worker.last_output_error

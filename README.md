@@ -9,6 +9,7 @@ BizInsight Agent 是一个基于 **AgentScope 2.0.7** 的 ToB 企业经营异常
 ## 1.0 能力
 
 - AgentScope `Agent`、`Toolkit`、`FunctionTool`、结构化输出和 `CustomEvent` 的真实集成。
+- 通用 AgentScope Supervisor：普通对话直接回答，专业问题调用内部 RAG，经营问题进入完整多 Agent 链路，实时天气通过独立 Weather MCP 查询。
 - Leader–Worker 并行协作；专项问题按需路由，综合问题最多四个任务。
 - SQLite 只读查询、数据集白名单、确定性指标计算和可追溯 Evidence。
 - 动态季度解析与数据库范围校验，支持区域、行业、客户规模、产品版本细分。
@@ -36,6 +37,14 @@ python -m bizinsight.cli --mode offline --question "分析公司2026年第二季
 
 打开 `outputs/demo/report.html` 查看离线报告。默认测试和离线 CLI 不访问网络、不会产生模型费用。
 
+在网页端接入前，可以直接用交互式 CLI 验证通用 Supervisor：
+
+```powershell
+python -m bizinsight.supervisor_cli
+```
+
+它保留当前会话的短期上下文。例如先问“今天天气怎么样”，再回答“上海”；也可以询问“你是谁”、内部专业知识或要求生成经营分析报告。实时天气使用无需额外密钥的 Open-Meteo Weather MCP。
+
 ## 在线模式
 
 复制 `.env.example` 为 `.env`，显式配置 `DASHSCOPE_API_KEY`、`BIZINSIGHT_MODEL_NAME` 和可选的 `TAVILY_API_KEY`，然后运行：
@@ -61,12 +70,16 @@ python evaluations/run_rag_evaluation.py --mode hybrid
 
 ```powershell
 python -m pip install -e ".[service]"
-# 先启动本机 Redis，再执行：
-.\scripts\start_backend.ps1
 .\scripts\start_webui.ps1
 ```
 
-BizInsight 扩展端点为 `GET /bizinsight/health` 和 `POST /bizinsight/analyze`。`custom_agent_cls=BizInsightServiceAgent` 会把官方 Web UI 的标准会话消息交给同一个 `run_analysis`，报告通过受控 `/bizinsight/reports` 静态路径打开。分析事件和 telemetry 分别写入 `*.events.json` 与 `*.telemetry.json`。
+`start_webui.ps1` 会启动本项目 FastAPI 服务并打开 `http://127.0.0.1:8000/`。如需在前台查看服务日志，可改为先运行 `.\scripts\start_backend.ps1`，再访问该地址。
+
+网页端和 CLI 共用同一个 Supervisor：输入普通问题会直接显示回答；专业知识问题调用内部 RAG；实时天气调用 Weather MCP；经营诊断问题进入现有 Leader–Worker–Reviewer 链路，并在页面右侧显示审核后的 HTML 报告。普通问答不会生成或伪造报告。
+
+服务默认使用本地 SQLite，启动不需要 Redis；只有显式设置 `BIZINSIGHT_SERVICE_STORAGE=redis` 时才连接 Redis。网页使用 `POST /bizinsight/chat`，AgentScope 标准 HTTP 会话接口仍可使用。Supervisor 再按意图选择通用回答、Hybrid RAG、Weather MCP 或现有 `run_analysis` 经营链路。
+
+BizInsight 扩展端点为 `GET /bizinsight/health`、`POST /bizinsight/chat` 和 `POST /bizinsight/analyze`，报告通过受控 `/bizinsight/reports` 静态路径打开。分析事件和 telemetry 分别写入 `*.events.json` 与 `*.telemetry.json`。
 
 ## 测试与评测
 

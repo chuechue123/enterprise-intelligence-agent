@@ -13,6 +13,7 @@ from agentscope.message import UserMsg
 from agentscope.model import ChatModelBase
 
 from bizinsight.data.provider import BusinessDataProvider
+from bizinsight.observability import aggregate_agent_usage
 from bizinsight.schemas import (
     EvidenceType,
     Finding,
@@ -45,7 +46,7 @@ class EvidenceReviewerAgent:
                 name="EvidenceReviewerAgent",
                 system_prompt=prompt,
                 model=model,
-                react_config=ReActConfig(max_iters=1),
+                react_config=ReActConfig(max_iters=3, structured_output_grace_iters=2),
                 injection_config=InjectionConfig(inject_runtime_state=False),
             )
 
@@ -97,8 +98,14 @@ class EvidenceReviewerAgent:
                         metric.period,
                     ).metric.value
                 except (KeyError, ValueError):
-                    issues.append(f"指标 {metric.metric_name} 无法按指标字典复算")
-                    changes.append(f"确认 {metric.metric_name} 的合法指标口径")
+                    issues.append(
+                        f"指标 {metric.metric_name}（{metric.period}）"
+                        "无法按指标字典复算"
+                    )
+                    changes.append(
+                        f"从 metrics 中删除未注册指标 {metric.metric_name}；"
+                        "只保留系统提示列出的授权指标"
+                    )
                     continue
                 if metric.value != expected:
                     issues.append(
@@ -144,7 +151,7 @@ class EvidenceReviewerAgent:
                         finding_id=finding.finding_id,
                         target_agent=owner,
                         reason="；".join(issues),
-                        required_changes=changes,
+                        required_changes=list(dict.fromkeys(changes)),
                     ),
                 )
             else:
@@ -178,20 +185,35 @@ class EvidenceReviewerAgent:
     ) -> ReviewResult:
         """Run deterministic guardrails first, then optional AgentScope judgment."""
         hard = self.review(findings, owners, allow_revision=allow_revision)
-        if self.agent is None or hard.status is not ReviewStatus.ACCEPTED:
+        if self.agent is None:
             return hard
+        # 硬审查全部拒绝时语义审查没有意义；终审时硬审查未通过也直接保留。
+        if (
+            allow_revision
+            and hard.status is ReviewStatus.REJECTED
+            or not allow_revision
+            and hard.status is not ReviewStatus.ACCEPTED
+        ):
+            return hard
+        round_hint = (
+            "当前是首轮审查：发现任何事实、解释与证据不一致的问题，"
+            "都通过 revision_requests 提出具体返工要求，不要直接拒绝。"
+            if allow_revision
+            else "当前是终审，不再有返工机会，请直接给出结论。"
+        )
         response = await self.agent.reply(
             UserMsg(
                 name="BizInsightWorkflow",
                 content=(
-                    "硬规则审查已通过。请只审查解释是否谨慎、结论是否与证据一致；"
-                    "不得改写指标。返回 ReviewResult。\n"
+                    "请只审查解释是否谨慎、结论是否与证据一致；"
+                    "不得改写指标。返回 ReviewResult。"
+                    f"{round_hint}\n"
                     + "\n".join(item.model_dump_json() for item in findings)
                 ),
             ),
             structured_schema=ReviewResult,
         )
-        self.last_usage = response.usage
+        self.last_usage = response.usage or aggregate_agent_usage(self.agent)
         if response.structured_output is None:
             return hard.model_copy(
                 update={
@@ -213,28 +235,26 @@ class EvidenceReviewerAgent:
                     + " 语义审查引用未知 Finding，已忽略。"
                 }
             )
-        if allow_revision and semantic.revision_requests:
-            owner_map = owners or {}
-            requests = [
-                request.model_copy(
-                    update={"target_agent": owner_map[request.finding_id]}
-                )
-                for request in semantic.revision_requests
-                if request.finding_id in owner_map
-            ]
-            semantic = semantic.model_copy(update={"revision_requests": requests})
-        if not allow_revision and semantic.revision_requests:
+        owner_map = owners or {}
+        semantic_requests = [
+            request.model_copy(
+                update={"target_agent": owner_map[request.finding_id]}
+            )
+            for request in semantic.revision_requests
+            if request.finding_id in owner_map
+        ]
+        if not allow_revision:
             rejected = list(
                 dict.fromkeys(
                     semantic.rejected_finding_ids
-                    + [item.finding_id for item in semantic.revision_requests]
+                    + [item.finding_id for item in semantic_requests]
                 )
             )
             accepted = [
                 item for item in semantic.accepted_finding_ids if item not in rejected
             ]
             status = ReviewStatus.PARTIAL if accepted else ReviewStatus.REJECTED
-            semantic = semantic.model_copy(
+            return semantic.model_copy(
                 update={
                     "status": status,
                     "accepted_finding_ids": accepted,
@@ -244,4 +264,70 @@ class EvidenceReviewerAgent:
                     + ["单轮返工结束后仍存在语义审查问题。"],
                 }
             )
-        return semantic
+
+        # 首轮：语义审查拒绝的 Finding 同样获得一次修订机会，与硬规则
+        # 修订请求按 finding 合并，避免同一 Finding 被重复返工覆盖。
+        converted: list[RevisionRequest] = []
+        kept_rejected: list[str] = []
+        for finding_id in semantic.rejected_finding_ids:
+            if finding_id not in owner_map:
+                kept_rejected.append(finding_id)
+                continue
+            suffix = re.sub(r"[^A-Za-z0-9_-]", "-", finding_id[8:])
+            converted.append(
+                RevisionRequest(
+                    request_id=f"REVISION-SEM-{suffix}",
+                    finding_id=finding_id,
+                    target_agent=owner_map[finding_id],
+                    reason="语义审查认为事实、业务解释或因果表述与证据不一致",
+                    required_changes=[
+                        "收敛或删除无证据支撑的解释与归因表述，"
+                        "与证据不一致的内容改写为待验证假设并写入 limitations",
+                    ],
+                )
+            )
+        merged: dict[str, RevisionRequest] = {}
+        for request in [*hard.revision_requests, *semantic_requests, *converted]:
+            existing = merged.get(request.finding_id)
+            if existing is None:
+                merged[request.finding_id] = request
+            else:
+                merged[request.finding_id] = existing.model_copy(
+                    update={
+                        "reason": f"{existing.reason}；{request.reason}",
+                        "required_changes": list(
+                            dict.fromkeys(
+                                existing.required_changes + request.required_changes
+                            )
+                        ),
+                    }
+                )
+        requests = list(merged.values())
+        problem_ids = {
+            item.finding_id for item in requests
+        } | set(kept_rejected)
+        accepted = [
+            item for item in hard.accepted_finding_ids if item not in problem_ids
+        ]
+        rejected = list(
+            dict.fromkeys(hard.rejected_finding_ids + kept_rejected)
+        )
+        if not (requests or rejected):
+            status = ReviewStatus.ACCEPTED
+        elif requests and not (accepted or rejected):
+            status = ReviewStatus.REVISION_REQUIRED
+        elif rejected and not accepted:
+            status = ReviewStatus.REJECTED
+        else:
+            status = ReviewStatus.PARTIAL
+        return ReviewResult(
+            status=status,
+            accepted_finding_ids=accepted,
+            rejected_finding_ids=rejected,
+            revision_requests=requests,
+            conflicts=list(dict.fromkeys(hard.conflicts + semantic.conflicts)),
+            data_limitations=list(
+                dict.fromkeys(hard.data_limitations + semantic.data_limitations)
+            ),
+            reviewer_notes=hard.reviewer_notes + semantic.reviewer_notes,
+        )
