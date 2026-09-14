@@ -77,6 +77,8 @@ python -m pip install -e ".[service]"
 
 网页端和 CLI 共用同一个 Supervisor：输入普通问题会直接显示回答；专业知识问题调用内部 RAG；实时天气调用 Weather MCP；经营诊断问题进入现有 Leader–Worker–Reviewer 链路，并在页面右侧显示审核后的 HTML 报告。普通问答不会生成或伪造报告。
 
+知识库页面位于 `http://127.0.0.1:8000/knowledge`，只读展示当前 RAG 索引中的真实文档，并支持按名称或类型搜索和分页查看。
+
 服务默认使用本地 SQLite，启动不需要 Redis；只有显式设置 `BIZINSIGHT_SERVICE_STORAGE=redis` 时才连接 Redis。网页使用 `POST /bizinsight/chat`，AgentScope 标准 HTTP 会话接口仍可使用。Supervisor 再按意图选择通用回答、Hybrid RAG、Weather MCP 或现有 `run_analysis` 经营链路。
 
 BizInsight 扩展端点为 `GET /bizinsight/health`、`POST /bizinsight/chat` 和 `POST /bizinsight/analyze`，报告通过受控 `/bizinsight/reports` 静态路径打开。分析事件和 telemetry 分别写入 `*.events.json` 与 `*.telemetry.json`。

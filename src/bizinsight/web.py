@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import math
 import time
 from collections import OrderedDict
 from collections.abc import Callable
@@ -15,7 +16,7 @@ from uuid import uuid4
 
 from agentscope.message import UserMsg
 from agentscope.state import AgentState
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
@@ -80,6 +81,27 @@ class ChatResponse(BaseModel):
     review_status: str | None = None
     executed_agents: list[str] = Field(default_factory=list)
     execution_flow: ExecutionFlow
+
+
+class KnowledgeDocumentItem(BaseModel):
+    """One safe, display-ready document from the local RAG index."""
+
+    document_id: str
+    title: str
+    document_type: str
+    status: Literal["ready"] = "ready"
+    updated_at: str
+    source_path: str
+
+
+class KnowledgeDocumentPage(BaseModel):
+    """Paginated knowledge document response consumed by the browser."""
+
+    items: list[KnowledgeDocumentItem]
+    total: int
+    page: int
+    page_size: int
+    pages: int
 
 
 class _WebAgent(Protocol):
@@ -153,6 +175,95 @@ _FLOW_NODES = (
 _WORKER_NAMES = {
     name for key, name in _FLOW_NODES if key not in {"supervisor", "reviewer"}
 }
+
+
+def _knowledge_document_type(document: dict[str, Any]) -> str:
+    """Map internal metadata to a small, stable set of UI categories."""
+
+    searchable = " ".join(
+        str(document.get(field, ""))
+        for field in ("document_id", "title", "department", "relative_path")
+    ).casefold()
+    rules = (
+        (("incident", "故障", "复盘"), "技术文档"),
+        (("operations-plan", "经营计划", "运营计划"), "经营计划"),
+        (("customer-interview", "客户访谈"), "客户资料"),
+        (("market", "competitor", "竞品", "行业"), "行业研究"),
+        (("product", "release", "cloudflow"), "产品文档"),
+        (("sla", "policy", "制度", "协议", "管理办法"), "制度文档"),
+    )
+    for needles, category in rules:
+        if any(needle in searchable for needle in needles):
+            return category
+    return "内部资料"
+
+
+def _load_knowledge_documents(project_root: Path) -> list[KnowledgeDocumentItem]:
+    """Load and validate the public subset of the deterministic RAG manifest."""
+
+    index_path = project_root / "data" / "knowledge" / "index.json"
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    raw_documents = payload.get("documents")
+    if not isinstance(raw_documents, list):
+        raise ValueError("knowledge index has no document manifest")
+
+    documents: dict[str, KnowledgeDocumentItem] = {}
+    for raw in raw_documents:
+        if not isinstance(raw, dict):
+            raise ValueError("knowledge document metadata must be an object")
+        required = ("document_id", "title", "date", "relative_path")
+        if any(not str(raw.get(field, "")).strip() for field in required):
+            raise ValueError("knowledge document metadata is incomplete")
+        document_id = str(raw["document_id"]).strip()
+        source_path = str(raw["relative_path"]).strip().replace("\\", "/")
+        source = Path(source_path)
+        if source.is_absolute() or ".." in source.parts:
+            raise ValueError("knowledge source path is unsafe")
+        documents.setdefault(
+            document_id,
+            KnowledgeDocumentItem(
+                document_id=document_id,
+                title=str(raw["title"]).strip(),
+                document_type=_knowledge_document_type(raw),
+                updated_at=str(raw["date"]).strip(),
+                source_path=source.as_posix(),
+            ),
+        )
+    return sorted(
+        documents.values(),
+        key=lambda item: (item.updated_at, item.document_id),
+        reverse=True,
+    )
+
+
+def _knowledge_document_page(
+    project_root: Path,
+    *,
+    query: str,
+    page: int,
+    page_size: int,
+) -> KnowledgeDocumentPage:
+    documents = _load_knowledge_documents(project_root)
+    normalized_query = query.strip().casefold()
+    if normalized_query:
+        documents = [
+            item
+            for item in documents
+            if normalized_query
+            in " ".join(
+                (item.document_id, item.title, item.document_type)
+            ).casefold()
+        ]
+    total = len(documents)
+    pages = max(1, math.ceil(total / page_size))
+    start = (page - 1) * page_size
+    return KnowledgeDocumentPage(
+        items=documents[start : start + page_size],
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages,
+    )
 
 
 def _empty_execution_flow(*, report_generated: bool = False) -> ExecutionFlow:
@@ -295,6 +406,27 @@ def attach_web_workbench(
     async def workbench() -> FileResponse:
         return FileResponse(web_root / "index.html")
 
+    async def knowledge_page() -> FileResponse:
+        return FileResponse(web_root / "knowledge.html")
+
+    async def knowledge_documents(
+        query: str = Query(default="", max_length=200),
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=10, ge=1, le=50),
+    ) -> KnowledgeDocumentPage:
+        try:
+            return _knowledge_document_page(
+                root,
+                query=query,
+                page=page,
+                page_size=page_size,
+            )
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="知识库索引暂不可用",
+            ) from exc
+
     async def chat(payload: ChatRequest) -> ChatResponse:
         session_id = payload.session_id or f"web-{uuid4().hex}"
         try:
@@ -339,6 +471,19 @@ def attach_web_workbench(
 
     app.add_api_route("/", workbench, methods=["GET"], include_in_schema=False)
     app.add_api_route(
+        "/knowledge",
+        knowledge_page,
+        methods=["GET"],
+        include_in_schema=False,
+    )
+    app.add_api_route(
+        "/bizinsight/knowledge/documents",
+        knowledge_documents,
+        methods=["GET"],
+        response_model=KnowledgeDocumentPage,
+        tags=["BizInsight"],
+    )
+    app.add_api_route(
         "/bizinsight/chat",
         chat,
         methods=["POST"],
@@ -353,6 +498,8 @@ __all__ = [
     "ChatResponse",
     "ExecutionFlow",
     "ExecutionNode",
+    "KnowledgeDocumentItem",
+    "KnowledgeDocumentPage",
     "WebSessionRegistry",
     "attach_web_workbench",
 ]

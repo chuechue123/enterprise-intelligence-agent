@@ -62,6 +62,48 @@ def _client() -> tuple[TestClient, dict[str, _FakeAgent]]:
     return TestClient(app), agents
 
 
+def _write_knowledge_index(root: Path) -> None:
+    knowledge = root / "data" / "knowledge"
+    knowledge.mkdir(parents=True)
+    (knowledge / "index.json").write_text(
+        json.dumps(
+            {
+                "documents": [
+                    {
+                        "document_id": "DOC-PRODUCT-RELEASE-202603",
+                        "title": "CloudFlow v3.2 发布说明",
+                        "date": "2026-03-28",
+                        "department": "产品研发部",
+                        "relative_path": "cloudflow_v32_release.md",
+                    },
+                    {
+                        "document_id": "DOC-SERVICE-SLA-001",
+                        "title": "客户支持服务等级协议（SLA）",
+                        "date": "2026-01-20",
+                        "department": "客户成功部",
+                        "relative_path": "service_sla.md",
+                    },
+                    {
+                        "document_id": "DOC-PRODUCT-RELEASE-202603",
+                        "title": "重复数据不会生成第二行",
+                        "date": "2025-01-01",
+                        "department": "产品研发部",
+                        "relative_path": "duplicate.md",
+                    },
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _knowledge_client(root: Path) -> TestClient:
+    app = FastAPI()
+    attach_web_workbench(app, project_root=root, agent_factory=_FakeAgent)
+    return TestClient(app, raise_server_exceptions=False)
+
+
 def test_workbench_and_assets_are_served() -> None:
     client, _ = _client()
 
@@ -89,6 +131,100 @@ def test_workbench_and_assets_are_served() -> None:
     assert 'fetch("/bizinsight/chat"' in script.text
     assert "data.execution_flow" in script.text
     assert "已调用 SQL/MCP" not in script.text
+
+
+def test_knowledge_page_and_assets_are_served() -> None:
+    client, _ = _client()
+
+    page = client.get("/knowledge")
+    script = client.get("/bizinsight/assets/knowledge.js")
+
+    assert page.status_code == 200
+    assert "知识库 / RAG" in page.text
+    assert 'id="knowledgeSearch"' in page.text
+    assert 'id="knowledgeRows"' in page.text
+    assert 'href="/knowledge"' in page.text
+    assert script.status_code == 200
+    assert 'fetch(`/bizinsight/knowledge/documents?' in script.text
+    assert "setTimeout" in script.text
+
+
+def test_knowledge_documents_are_deduplicated_sorted_and_typed(
+    tmp_path: Path,
+) -> None:
+    _write_knowledge_index(tmp_path)
+    response = _knowledge_client(tmp_path).get(
+        "/bizinsight/knowledge/documents?page=1&page_size=10"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 2
+    assert payload["pages"] == 1
+    assert [item["document_id"] for item in payload["items"]] == [
+        "DOC-PRODUCT-RELEASE-202603",
+        "DOC-SERVICE-SLA-001",
+    ]
+    assert payload["items"][0] == {
+        "document_id": "DOC-PRODUCT-RELEASE-202603",
+        "title": "CloudFlow v3.2 发布说明",
+        "document_type": "产品文档",
+        "status": "ready",
+        "updated_at": "2026-03-28",
+        "source_path": "cloudflow_v32_release.md",
+    }
+    assert payload["items"][1]["document_type"] == "制度文档"
+
+
+def test_knowledge_documents_support_search_and_pagination(tmp_path: Path) -> None:
+    _write_knowledge_index(tmp_path)
+    client = _knowledge_client(tmp_path)
+
+    searched = client.get(
+        "/bizinsight/knowledge/documents",
+        params={"query": "产品文档", "page": 1, "page_size": 10},
+    )
+    paged = client.get(
+        "/bizinsight/knowledge/documents",
+        params={"page": 2, "page_size": 1},
+    )
+
+    assert searched.status_code == 200
+    assert searched.json()["total"] == 1
+    assert searched.json()["items"][0]["title"] == "CloudFlow v3.2 发布说明"
+    assert paged.status_code == 200
+    assert paged.json()["page"] == 2
+    assert paged.json()["pages"] == 2
+    assert paged.json()["items"][0]["document_id"] == "DOC-SERVICE-SLA-001"
+
+
+def test_knowledge_documents_validate_pagination(tmp_path: Path) -> None:
+    _write_knowledge_index(tmp_path)
+    client = _knowledge_client(tmp_path)
+
+    assert client.get(
+        "/bizinsight/knowledge/documents?page=0&page_size=10"
+    ).status_code == 422
+    assert client.get(
+        "/bizinsight/knowledge/documents?page=1&page_size=51"
+    ).status_code == 422
+
+
+def test_knowledge_documents_fail_safely_for_missing_or_invalid_index(
+    tmp_path: Path,
+) -> None:
+    client = _knowledge_client(tmp_path)
+    missing = client.get("/bizinsight/knowledge/documents")
+
+    knowledge = tmp_path / "data" / "knowledge"
+    knowledge.mkdir(parents=True)
+    (knowledge / "index.json").write_text("not-json", encoding="utf-8")
+    invalid = client.get("/bizinsight/knowledge/documents")
+
+    assert missing.status_code == 503
+    assert invalid.status_code == 503
+    assert missing.json()["detail"] == "知识库索引暂不可用"
+    assert invalid.json()["detail"] == "知识库索引暂不可用"
 
 
 def test_chat_reuses_agent_within_session_and_isolates_sessions() -> None:
