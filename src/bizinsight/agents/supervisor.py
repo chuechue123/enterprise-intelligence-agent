@@ -66,6 +66,8 @@ class SupervisorAgent(Agent):
         self._core_tools_ready = False
         self._weather_connection: WeatherMCPConnection | None = None
         self._weather_tool_names: list[str] = []
+        self._custom_mcp_connections: list[Any] = []
+        self.custom_mcp_errors: list[dict[str, str]] = []
         self.last_route = "general"
         self.last_business_metadata: dict[str, Any] | None = None
 
@@ -171,6 +173,30 @@ class SupervisorAgent(Agent):
         self._weather_tool_names = []
         if connection is not None:
             await connection.close()
+
+    async def attach_custom_mcps(self) -> list[str]:
+        """Attach enabled custom MCP tools authorized for this Supervisor."""
+        from bizinsight.mcp.custom import attach_enabled_servers
+
+        connections, errors = await attach_enabled_servers(
+            project_root=self.project_root,
+            target="BizInsightSupervisor",
+            toolkit=self.toolkit,
+        )
+        self._custom_mcp_connections.extend(connections)
+        self.custom_mcp_errors = errors
+        return [
+            name
+            for connection in connections
+            for name in connection.attached_tool_names
+        ]
+
+    async def close(self) -> None:
+        """Release persistent MCP sessions owned by this browser session."""
+        from bizinsight.mcp.custom import close_connections
+
+        await self._close_weather_mcp()
+        await close_connections(self._custom_mcp_connections, self.toolkit)
 
     async def search_internal_knowledge(
         self,

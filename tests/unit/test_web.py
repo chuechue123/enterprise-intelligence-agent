@@ -131,6 +131,16 @@ def test_workbench_and_assets_are_served() -> None:
     assert 'fetch("/bizinsight/chat"' in script.text
     assert "data.execution_flow" in script.text
     assert "已调用 SQL/MCP" not in script.text
+    assert 'id="conversationHistoryList"' in page.text
+    assert 'id="newConversation"' in page.text
+    assert "bizinsight.web.conversations.v1" in script.text
+    assert "function switchConversation" in script.text
+    assert "localStorage.setItem(CONVERSATIONS_KEY" in script.text
+    assert "execution: null" in script.text
+    assert "item.execution = currentExecution" in script.text
+    assert "function restoreExecution(execution)" in script.text
+    assert "restoreExecution(item.execution)" in script.text
+    assert "flow: data.execution_flow || null" in script.text
 
 
 def test_knowledge_page_and_assets_are_served() -> None:

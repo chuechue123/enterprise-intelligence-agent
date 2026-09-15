@@ -1,6 +1,14 @@
 (() => {
   "use strict";
 
+  const CONVERSATIONS_KEY = "bizinsight.web.conversations.v1";
+  const ACTIVE_SESSION_KEY = "bizinsight.web.activeSession";
+  const LEGACY_HISTORY_KEY = "bizinsight.web.history";
+  const LEGACY_DRAFT_KEY = "bizinsight.web.draft";
+  const LEGACY_REPORT_KEY = "bizinsight.web.report";
+  const LEGACY_SESSION_KEY = "bizinsight.web.session";
+  const MAX_CONVERSATIONS = 30;
+
   const form = document.getElementById("chatForm");
   const question = document.getElementById("question");
   const sendButton = document.getElementById("sendButton");
@@ -15,21 +23,246 @@
   const openReport = document.getElementById("openReport");
   const reportMeta = document.getElementById("reportMeta");
   const toast = document.getElementById("toast");
+  const conversationEmpty = document.getElementById("conversationEmpty");
+  const historyList = document.getElementById("conversationHistoryList");
+  const newConversationButton = document.getElementById("newConversation");
   const nodes = Array.from(document.querySelectorAll(".agent-node"));
   const timelinePoints = Array.from(document.querySelectorAll(".timeline-point"));
   const timelineLines = Array.from(document.querySelectorAll(".timeline-line"));
   let startedAt = 0;
   let timerHandle = null;
+  let busy = false;
+  let conversations = [];
+  let activeSessionId = "";
+  let currentReport = null;
+  let currentExecution = null;
+  let restoringConversation = false;
+
+  function newSessionId() {
+    const random = crypto.randomUUID
+      ? crypto.randomUUID().replaceAll("-", "")
+      : `${Date.now()}${Math.random().toString(16).slice(2)}`;
+    return `web-${random}`;
+  }
+
+  function makeConversation(messages = [], id = newSessionId()) {
+    const firstQuestion = messages.find((message) => message.kind === "user")?.text?.trim();
+    return {
+      id,
+      title: firstQuestion ? firstQuestion.slice(0, 28) : "新对话",
+      updatedAt: Date.now(),
+      messages,
+      draft: "",
+      report: null,
+      execution: null
+    };
+  }
+
+  function loadConversations() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(CONVERSATIONS_KEY) || "[]");
+      if (Array.isArray(parsed)) {
+        conversations = parsed.filter((item) =>
+          item && typeof item.id === "string" && Array.isArray(item.messages)
+        ).slice(0, MAX_CONVERSATIONS);
+      }
+    } catch (_) { conversations = []; }
+
+    if (!conversations.length) {
+      let legacyMessages = [];
+      try {
+        const parsed = JSON.parse(sessionStorage.getItem(LEGACY_HISTORY_KEY) || "[]");
+        if (Array.isArray(parsed)) legacyMessages = parsed;
+      } catch (_) { /* Start with a clean conversation. */ }
+      const legacyId = sessionStorage.getItem(LEGACY_SESSION_KEY) || newSessionId();
+      const migrated = makeConversation(legacyMessages, legacyId);
+      migrated.draft = sessionStorage.getItem(LEGACY_DRAFT_KEY) || "";
+      try {
+        migrated.report = JSON.parse(sessionStorage.getItem(LEGACY_REPORT_KEY) || "null");
+      } catch (_) { migrated.report = null; }
+      conversations = [migrated];
+    }
+
+    const requestedSession = localStorage.getItem(ACTIVE_SESSION_KEY);
+    activeSessionId = conversations.some((item) => item.id === requestedSession)
+      ? requestedSession
+      : conversations[0].id;
+    persistConversations();
+  }
+
+  function activeConversation() {
+    return conversations.find((item) => item.id === activeSessionId);
+  }
+
+  function captureMessages() {
+    return Array.from(messageList.querySelectorAll("article.message"))
+      .filter((element) => element.dataset.thinking !== "true")
+      .map((element) => ({
+        kind: element.classList.contains("user") ? "user" : element.classList.contains("error") ? "error" : "assistant",
+        text: element.querySelector(".message-text")?.textContent || "",
+        route: element.dataset.route || ""
+      }));
+  }
+
+  function persistConversations() {
+    conversations.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    conversations = conversations.slice(0, MAX_CONVERSATIONS);
+    try {
+      localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations));
+      localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId);
+    } catch (_) { /* Storage may be unavailable in privacy mode. */ }
+  }
+
+  function saveHistory() {
+    if (restoringConversation) return;
+    const item = activeConversation();
+    if (!item) return;
+    item.messages = captureMessages();
+    const firstQuestion = item.messages.find((message) => message.kind === "user")?.text?.trim();
+    item.title = firstQuestion ? firstQuestion.slice(0, 28) : "新对话";
+    item.updatedAt = Date.now();
+    item.draft = question.value;
+    item.report = currentReport;
+    item.execution = currentExecution;
+    persistConversations();
+    renderConversationHistory();
+  }
+
+  function saveCurrentWithoutTouch() {
+    const item = activeConversation();
+    if (!item || restoringConversation) return;
+    item.messages = captureMessages();
+    item.draft = question.value;
+    item.report = currentReport;
+    item.execution = currentExecution;
+  }
+
+  function saveDraft() {
+    saveHistory();
+  }
+
+  function historyTime(timestamp) {
+    const date = new Date(Number(timestamp) || Date.now());
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+      return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+    }
+    return date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
+  }
+
+  function renderConversationHistory() {
+    historyList.replaceChildren();
+    const visible = conversations.filter((item) => item.messages.length || item.id === activeSessionId);
+    if (!visible.length) {
+      const empty = document.createElement("p");
+      empty.className = "history-empty";
+      empty.textContent = "暂无历史会话";
+      historyList.appendChild(empty);
+      return;
+    }
+    visible.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = `history-item${item.id === activeSessionId ? " active" : ""}`;
+      row.dataset.sessionId = item.id;
+      row.setAttribute("aria-current", item.id === activeSessionId ? "true" : "false");
+      const main = document.createElement("button");
+      main.type = "button";
+      main.className = "history-item-main";
+      main.setAttribute("aria-label", "切换到该会话");
+      const title = document.createElement("span");
+      title.className = "history-item-title";
+      title.textContent = item.title || "新对话";
+      const lastMessage = [...item.messages].reverse().find((message) => message.text?.trim());
+      const preview = document.createElement("span");
+      preview.className = "history-item-preview";
+      preview.textContent = `${historyTime(item.updatedAt)} · ${lastMessage?.text || "等待输入问题"}`;
+      main.append(title, preview);
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "history-item-delete";
+      del.title = "删除该会话";
+      del.setAttribute("aria-label", "删除该会话");
+      del.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" /></svg>`;
+      row.append(main, del);
+      historyList.appendChild(row);
+    });
+  }
+
+  function resetReport() {
+    currentReport = null;
+    reportFrame.removeAttribute("src");
+    openReport.removeAttribute("href");
+    reportMeta.textContent = "";
+    reportReady.hidden = true;
+    reportEmpty.hidden = false;
+  }
+
+  function restoreConversation() {
+    const item = activeConversation();
+    if (!item) return;
+    restoringConversation = true;
+    messageList.replaceChildren();
+    conversationEmpty.hidden = Boolean(item.messages.length);
+    item.messages.forEach((message) => {
+      if (message?.kind && message.text != null) {
+        addMessage(message.kind, message.text, message.route || "", false);
+      }
+    });
+    question.value = item.draft || "";
+    resetReport();
+    if (item.report?.report_url) showReport(item.report, false);
+    restoreExecution(item.execution);
+    restoringConversation = false;
+    renderConversationHistory();
+  }
+
+  function switchConversation(sessionIdValue) {
+    if (busy || sessionIdValue === activeSessionId) return;
+    saveCurrentWithoutTouch();
+    activeSessionId = sessionIdValue;
+    persistConversations();
+    restoreConversation();
+    question.focus();
+  }
+
+  function createConversation() {
+    if (busy) return;
+    saveCurrentWithoutTouch();
+    const item = makeConversation();
+    conversations.unshift(item);
+    activeSessionId = item.id;
+    persistConversations();
+    restoreConversation();
+    routeSummary.textContent = "完成后将根据本次运行记录展示真实调用情况";
+    question.focus();
+  }
+
+  function deleteConversation(sessionId) {
+    if (busy) { window.alert("正在执行分析，请稍后再删除"); return; }
+    const item = conversations.find((c) => c.id === sessionId);
+    if (!item) return;
+    const isActive = sessionId === activeSessionId;
+    const firstLine = item.messages.find((m) => m.text?.trim())?.text?.trim() || "该会话";
+    const label = firstLine.length > 28 ? firstLine.slice(0, 28) + "…" : firstLine;
+    const ok = window.confirm(`确定要删除会话「${label}」吗？\n\n此操作无法撤销。`);
+    if (!ok) return;
+    conversations = conversations.filter((c) => c.id !== sessionId);
+    if (isActive) {
+      if (conversations.length) {
+        activeSessionId = conversations[0].id;
+      } else {
+        const fresh = makeConversation();
+        conversations = [fresh];
+        activeSessionId = fresh.id;
+      }
+      restoreConversation();
+    }
+    persistConversations();
+    renderConversationHistory();
+  }
 
   function sessionId() {
-    const key = "bizinsight.web.session";
-    let value = sessionStorage.getItem(key);
-    if (!value) {
-      const random = crypto.randomUUID ? crypto.randomUUID().replaceAll("-", "") : `${Date.now()}${Math.random().toString(16).slice(2)}`;
-      value = `web-${random}`;
-      sessionStorage.setItem(key, value);
-    }
-    return value;
+    return activeSessionId;
   }
 
   function elapsedText(milliseconds) {
@@ -55,9 +288,10 @@
     runtimeLabel.textContent = "本次运行";
   }
 
-  function addMessage(kind, text, route = "") {
+  function addMessage(kind, text, route = "", persist = true) {
     const article = document.createElement("article");
     article.className = `message ${kind}`;
+    article.dataset.route = route;
     const avatar = document.createElement("span");
     avatar.className = "message-avatar";
     if (kind === "user") {
@@ -86,14 +320,16 @@
     body.append(meta, content);
     article.append(avatar, body);
     messageList.appendChild(article);
+    conversationEmpty.hidden = true;
     requestAnimationFrame(() => {
       conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
     });
+    if (persist) saveHistory();
     return article;
   }
 
   function addThinking() {
-    const article = addMessage("assistant", "");
+    const article = addMessage("assistant", "", "", false);
     article.dataset.thinking = "true";
     const content = article.querySelector(".message-text");
     const dots = document.createElement("span");
@@ -126,6 +362,7 @@
   }
 
   function beginFlow() {
+    currentExecution = null;
     resetFlow();
     routeSummary.textContent = "正在处理，完成后将显示本次运行的真实调用情况";
   }
@@ -163,7 +400,7 @@
       const succeeded = called.filter((state) => state.status === "success").length;
       const failed = called.filter((state) => state.status === "failed").length;
       routeSummary.textContent = `本次实际调用 ${called.length} 个节点：${succeeded} 个成功，${failed} 个失败`;
-      return;
+      return routeSummary.textContent;
     }
     routeSummary.textContent = ({
       general: "Supervisor 已直接完成本次普通问答",
@@ -171,10 +408,31 @@
       weather: "Supervisor 已通过 Weather MCP 获取实时信息",
       weather_unavailable: "Weather MCP 当前不可用，智能体已返回降级说明"
     })[route] || "智能体已完成本次请求";
+    return routeSummary.textContent;
   }
 
-  function showReport(data) {
+  function restoreExecution(execution) {
+    currentExecution = null;
+    resetFlow();
+    routeSummary.textContent = "完成后将根据本次运行记录展示真实调用情况";
+    timer.textContent = "00:00";
+    runtimeLabel.textContent = "本次运行";
+    if (!execution || typeof execution !== "object") return;
+
+    const route = typeof execution.route === "string" ? execution.route : "";
+    const flow = execution.flow && typeof execution.flow === "object" ? execution.flow : null;
+    if (flow) completeFlow(route, flow);
+    if (typeof execution.summary === "string" && execution.summary.trim()) {
+      routeSummary.textContent = execution.summary;
+    }
+    const duration = Number(execution.duration_ms);
+    if (Number.isFinite(duration) && duration >= 0) timer.textContent = elapsedText(duration);
+    currentExecution = execution;
+  }
+
+  function showReport(data, persist = true) {
     if (!data.report_url || !data.report_url.startsWith("/bizinsight/reports/") || data.report_url.includes("..")) return;
+    currentReport = data;
     reportEmpty.hidden = true;
     reportReady.hidden = false;
     reportFrame.src = data.report_url;
@@ -183,6 +441,7 @@
     if (data.review_status) details.push(`审核状态：${data.review_status}`);
     if (data.run_id) details.push(`Run ID：${data.run_id}`);
     reportMeta.textContent = details.join(" · ") || "证据审核已完成";
+    if (persist) saveHistory();
   }
 
   function showToast(text) {
@@ -210,6 +469,7 @@
     }
     addMessage("user", text);
     const thinking = addThinking();
+    busy = true;
     sendButton.disabled = true;
     question.disabled = true;
     beginFlow();
@@ -226,18 +486,37 @@
       thinking.remove();
       addMessage("assistant", data.answer, data.route);
       measuredDurationMs = data.execution_flow?.duration_ms ?? null;
-      completeFlow(data.route, data.execution_flow);
+      const summary = completeFlow(data.route, data.execution_flow);
+      const duration = Number.isFinite(measuredDurationMs)
+        ? measuredDurationMs
+        : performance.now() - startedAt;
+      currentExecution = {
+        route: data.route || "",
+        flow: data.execution_flow || null,
+        duration_ms: duration,
+        summary
+      };
       showReport(data);
       question.value = "";
+      saveDraft();
     } catch (error) {
       thinking.remove();
       addMessage("error", error instanceof Error ? error.message : "本次请求未完成，请重试。");
       routeSummary.textContent = "请求未完成；输入内容已保留，可以直接重试";
       document.querySelector('[data-node="supervisor"]').classList.remove("running");
+      measuredDurationMs = performance.now() - startedAt;
+      currentExecution = {
+        route: "",
+        flow: null,
+        duration_ms: measuredDurationMs,
+        summary: routeSummary.textContent
+      };
+      saveHistory();
     } finally {
       stopTimer(measuredDurationMs);
       sendButton.disabled = false;
       question.disabled = false;
+      busy = false;
       question.focus();
     }
   }
@@ -272,10 +551,28 @@
   question.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
   });
-  document.querySelectorAll("[data-scroll]").forEach((button) => {
-    button.addEventListener("click", () => document.getElementById(button.dataset.scroll)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  question.addEventListener("input", saveDraft);
+  historyList.addEventListener("click", (event) => {
+    const mainBtn = event.target.closest(".history-item-main");
+    if (mainBtn) {
+      const row = mainBtn.closest(".history-item");
+      if (row?.dataset.sessionId) switchConversation(row.dataset.sessionId);
+      return;
+    }
+    const delBtn = event.target.closest(".history-item-delete");
+    if (delBtn) {
+      const row = delBtn.closest(".history-item");
+      if (row?.dataset.sessionId) deleteConversation(row.dataset.sessionId);
+    }
   });
+  newConversationButton.addEventListener("click", createConversation);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") { saveHistory(); saveDraft(); }
+  });
+  window.addEventListener("beforeunload", () => { saveHistory(); saveDraft(); });
 
   loadHealth();
+  loadConversations();
+  restoreConversation();
   question.focus();
 })();

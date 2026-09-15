@@ -254,6 +254,28 @@ async def run_analysis(
                         "error_type": type(exc).__name__,
                     }
                 )
+    custom_mcp_connections: list[tuple[Any, list[Any]]] = []
+    if mode == "online":
+        from bizinsight.mcp.custom import attach_enabled_servers
+
+        for worker_name, worker in workers.items():
+            toolkit = getattr(worker, "toolkit", None)
+            if toolkit is None or worker_name == WorkerName.EXTERNAL_RESEARCH:
+                continue
+            connections, errors = await attach_enabled_servers(
+                project_root=project_root,
+                target=worker_name.value,
+                toolkit=toolkit,
+            )
+            custom_mcp_connections.append((worker, connections))
+            for error in errors:
+                telemetry.record_event(
+                    {
+                        "event": "custom_mcp_degraded",
+                        "worker": worker_name.value,
+                        **error,
+                    }
+                )
 
     async def record_event(event: Any) -> None:
         telemetry.record_event(event)
@@ -329,21 +351,31 @@ async def run_analysis(
             {"event": "revision_round", "count": cycle.revision_count}
         )
     telemetry.record_event({"event": "final_review", "status": review.status.value})
-    # AgentScope stateful stdio clients enter nested anyio cancel scopes in
-    # this task. They must leave those scopes in LIFO order.
+    from bizinsight.mcp.custom import close_connections
+
+    # Connections must leave their nested anyio scopes in reverse attach order.
+    for worker, connections in reversed(custom_mcp_connections):
+        try:
+            await close_connections(connections, getattr(worker, "toolkit", None))
+        except Exception as exc:
+            telemetry.record_event(
+                {
+                    "event": "custom_mcp_close_error",
+                    "worker": getattr(worker, "worker_name", type(worker).__name__),
+                    "error_type": type(exc).__name__,
+                }
+            )
     for worker in reversed(mcp_workers):
         try:
             await worker.close()
         except asyncio.CancelledError:
-            # Real cancellation must propagate; cleanup noise was already
-            # handled inside BusinessMCPConnection.close().
             raise
         except Exception as exc:
             telemetry.record_event(
                 {
                     "event": "mcp_close_error",
                     "worker": getattr(worker, "worker_name", type(worker).__name__),
-                    "error": str(exc),
+                    "error_type": type(exc).__name__,
                 }
             )
     if vector_index is not None:

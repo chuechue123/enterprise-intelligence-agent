@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>报告预览 · BizInsight Agent</title>
+  <link rel="stylesheet" href="/bizinsight/assets/styles.css?v=20260914-15" />
+</head>
+
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="BizInsight Agent 首页">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-name">BizInsight Agent</span>
+    </a>
+    <span class="top-divider"></span>
+    <span class="product-note">查看和下载已生成的分析报告</span>
+  </header>
+
+  <div class="app-shell plain">
+    <nav class="sidebar" aria-label="主导航">
+      <a class="nav-item" href="/">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5" />
+        </svg>
+        <span>分析工作台</span>
+      </a>
+      <a class="nav-item" href="/bizinsight/mcp">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 4h16v5H4zM4 15h16v5H4zM9 9.5h6v5H9z" />
+        </svg>
+        <span>MCP 工具</span>
+      </a>
+      <a class="nav-item" href="/knowledge">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M4.5 5.5A3.5 3.5 0 0 1 8 2h4v17H8a3.5 3.5 0 0 0-3.5 3zM19.5 5.5A3.5 3.5 0 0 0 16 2h-4v17h4a3.5 3.5 0 0 1 3.5 3z" />
+        </svg>
+        <span>知识库 / RAG</span>
+      </a>
+      <div class="sidebar-foot">
+        <span class="shield-mini"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M899.644952 166.424381L350.854095 705.987048 125.232762 495.079619c-68.303238-63.853714-171.166476 38.607238-102.64381 102.64381l278.235429 260.096c29.062095 27.172571 73.74019 28.42819 102.643809 0l598.820572-588.739048c66.840381-65.706667-35.876571-168.313905-102.64381-102.656z"
+              fill="#707070" />
+          </svg></span>
+        <p>只读数据访问<br />证据链路可追溯</p>
+      </div>
+    </nav>
+
+    <main class="workspace">
+      <section class="card ask-card report-card" aria-labelledby="reportTitle">
+        <div class="section-heading">
+          <span class="heading-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M8.5 12h7M8.5 15.5h5" />
+            </svg>
+          </span>
+          <div>
+            <h1 id="reportTitle">报告预览</h1>
+            <p>最近生成的经营异常诊断报告，点击左侧卡片查看完整 HTML 内容</p>
+          </div>
+          <button id="refreshReports" class="inline-refresh" type="button" title="刷新列表">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-3.2-6.9" />
+              <path d="M21 4v5h-5" />
+            </svg>
+            刷新列表
+          </button>
+        </div>
+
+        <div class="report-body">
+          <aside class="report-list-pane">
+            <div class="report-list" id="reportList">
+              <p class="sidebar-empty">正在加载...</p>
+            </div>
+          </aside>
+
+          <div class="report-preview-pane">
+            <div class="preview-toolbar" hidden>
+              <a id="downloadReportMd" class="preview-btn" download>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16" />
+                </svg>
+                下载 Markdown
+              </a>
+            </div>
+            <div class="preview-frame-wrap">
+              <div class="preview-empty" id="previewEmpty">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z" />
+                  <path d="M14 3.5V7h3.5M8 12h8M8 16h5" />
+                </svg>
+                <p>左侧选择一份已生成的报告开始预览</p>
+                <p class="hint">对话分析完成后，报告会自动出现在这里</p>
+              </div>
+              <iframe id="reportFrame" title="报告预览" hidden></iframe>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/bizinsight/assets/report.js?v=20260914-12" defer></script>
+</body>
+
+</html>

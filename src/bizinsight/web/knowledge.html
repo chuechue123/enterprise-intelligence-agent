@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="light" />
   <title>知识库 / RAG · BizInsight Agent</title>
-  <link rel="stylesheet" href="/bizinsight/assets/styles.css" />
+  <link rel="stylesheet" href="/bizinsight/assets/styles.css?v=20260914-15" />
 </head>
 
 <body>
@@ -15,12 +15,13 @@
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       <span class="brand-name">BizInsight Agent</span>
     </a>
-    <div class="online-pill" id="knowledgeHealthPill"><span class="status-dot"></span><span id="knowledgeHealth">索引检查中</span></div>
+    <div class="online-pill" id="knowledgeHealthPill"><span class="status-dot"></span><span
+        id="knowledgeHealth">索引检查中</span></div>
     <span class="top-divider"></span>
-    <span class="product-note">企业经营知识与检索索引</span>
+    <span class="product-note">企业知识与检索索引</span>
   </header>
 
-  <div class="app-shell knowledge-shell">
+  <div class="app-shell plain">
     <nav class="sidebar" aria-label="主导航">
       <a class="nav-item" href="/">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -28,46 +29,64 @@
         </svg>
         <span>分析工作台</span>
       </a>
-      <a class="nav-item" href="/#reportPanel">
+      <a class="nav-item" href="/bizinsight/mcp">
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 15.5h6" />
+          <path d="M4 4h16v5H4zM4 15h16v5H4zM9 9.5h6v5H9z" />
         </svg>
-        <span>报告预览</span>
+        <span>MCP 工具</span>
       </a>
       <a class="nav-item active" href="/knowledge" aria-current="page">
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4.5 5.5A3.5 3.5 0 0 1 8 2h4v17H8a3.5 3.5 0 0 0-3.5 3zM19.5 5.5A3.5 3.5 0 0 0 16 2h-4v17h4a3.5 3.5 0 0 1 3.5 3z" />
+          <path
+            d="M4.5 5.5A3.5 3.5 0 0 1 8 2h4v17H8a3.5 3.5 0 0 0-3.5 3zM19.5 5.5A3.5 3.5 0 0 0 16 2h-4v17h4a3.5 3.5 0 0 1 3.5 3z" />
         </svg>
         <span>知识库 / RAG</span>
       </a>
       <div class="sidebar-foot">
-        <span class="shield-mini" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="m12 3 7 3v5c0 4.6-2.8 8.1-7 10-4.2-1.9-7-5.4-7-10V6zM9 12l2 2 4-5" /></svg>
-        </span>
-        <p>只读知识索引<br />来源位置可追溯</p>
+        <span class="shield-mini"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M899.644952 166.424381L350.854095 705.987048 125.232762 495.079619c-68.303238-63.853714-171.166476 38.607238-102.64381 102.64381l278.235429 260.096c29.062095 27.172571 73.74019 28.42819 102.643809 0l598.820572-588.739048c66.840381-65.706667-35.876571-168.313905-102.64381-102.656z"
+              fill="#707070" />
+          </svg></span>
+        <p>只读数据访问<br />证据链路可追溯</p>
       </div>
     </nav>
 
-    <main class="knowledge-workspace">
-      <section class="knowledge-card" aria-labelledby="knowledgeTitle">
-        <div class="knowledge-header">
-          <div class="knowledge-heading">
-            <span class="knowledge-book" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M3.5 5.7c2.7-1.6 5.4-1.3 8.5.8v14c-3.1-2.1-5.8-2.4-8.5-.8zM20.5 5.7c-2.7-1.6-5.4-1.3-8.5.8v14c3.1-2.1 5.8-2.4 8.5-.8z" />
-              </svg>
-            </span>
-            <div>
-              <h1 id="knowledgeTitle">知识库 / RAG</h1>
-              <p>当前已纳入检索的企业知识库文档，供 Agent 进行分析引用。</p>
-            </div>
+    <main class="workspace">
+      <section class="card ask-card" aria-labelledby="knowledgeTitle">
+        <div class="section-heading">
+          <span class="heading-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M3.5 5.7c2.7-1.6 5.4-1.3 8.5.8v14c-3.1-2.1-5.8-2.4-8.5-.8zM20.5 5.7c-2.7-1.6-5.4-1.3-8.5.8v14c3.1-2.1 5.8-2.4 8.5-.8z" />
+            </svg>
+          </span>
+          <div>
+            <h1 id="knowledgeTitle">知识库 / RAG</h1>
+            <p>当前已纳入检索的企业知识库文档，供 Agent 进行分析引用</p>
           </div>
+        </div>
+
+        <div class="knowledge-header">
           <label class="knowledge-search" for="knowledgeSearch">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16 16 4 4" />
+            </svg>
             <span class="sr-only">搜索文档</span>
-            <input id="knowledgeSearch" type="search" maxlength="200" autocomplete="off" placeholder="搜索文档（按名称或类型）..." />
+            <input id="knowledgeSearch" type="search" maxlength="200" autocomplete="off"
+              placeholder="搜索文档（按名称或类型）..." />
             <kbd>Ctrl K</kbd>
           </label>
+          <div class="knowledge-actions">
+            <button id="uploadBtn" class="upload-btn" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 16V4m0 0-4 4m4-4 4 4M4 18v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+              </svg>
+              上传文件
+            </button>
+            <input id="fileInput" type="file" accept=".md,.markdown" hidden />
+          </div>
         </div>
 
         <div class="knowledge-table-wrap">
@@ -95,11 +114,15 @@
           <p>共 <strong id="knowledgeTotal">0</strong> 条</p>
           <nav class="knowledge-pagination" aria-label="知识库分页">
             <button id="previousPage" type="button" aria-label="上一页">
-              <svg viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6" /></svg>
+              <svg viewBox="0 0 24 24">
+                <path d="m14.5 6-6 6 6 6" />
+              </svg>
             </button>
             <div id="pageNumbers" class="page-numbers"></div>
             <button id="nextPage" type="button" aria-label="下一页">
-              <svg viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6" /></svg>
+              <svg viewBox="0 0 24 24">
+                <path d="m9.5 6 6 6-6 6" />
+              </svg>
             </button>
             <label class="page-size">每页
               <select id="pageSize" aria-label="每页显示数量">
@@ -114,13 +137,19 @@
     </main>
   </div>
 
-  <div class="knowledge-popover" id="knowledgePopover" role="dialog" aria-modal="false" aria-labelledby="popoverTitle" hidden>
+  <div class="knowledge-popover" id="knowledgePopover" role="dialog" aria-modal="false" aria-labelledby="popoverTitle"
+    hidden>
     <button class="popover-close" id="popoverClose" type="button" aria-label="关闭">×</button>
     <span>索引信息</span>
     <strong id="popoverTitle"></strong>
-    <dl><dt>文档 ID</dt><dd id="popoverId"></dd><dt>索引来源</dt><dd id="popoverSource"></dd></dl>
+    <dl>
+      <dt>文档 ID</dt>
+      <dd id="popoverId"></dd>
+      <dt>索引来源</dt>
+      <dd id="popoverSource"></dd>
+    </dl>
   </div>
-  <script src="/bizinsight/assets/knowledge.js" defer></script>
+  <script src="/bizinsight/assets/knowledge.js?v=20260914-8" defer></script>
 </body>
 
 </html>

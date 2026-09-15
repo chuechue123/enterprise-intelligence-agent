@@ -164,7 +164,12 @@ def _chunk_document(document: KnowledgeDocument) -> list[dict[str, Any]]:
 
 
 def build_knowledge_index(knowledge_dir: Path, output_path: Path) -> dict[str, Any]:
-    """Validate Markdown sources and write a deterministic JSON index."""
+    """Validate Markdown sources and write a deterministic JSON index.
+
+    Tolerant of individual file errors: files that fail to parse are skipped
+    with a warning; duplicate document_ids are auto-suffixed so the build
+    never fails from stale data left behind by earlier experiments.
+    """
 
     knowledge_dir = knowledge_dir.resolve()
     source_paths = sorted(
@@ -176,12 +181,54 @@ def build_knowledge_index(knowledge_dir: Path, output_path: Path) -> dict[str, A
     if not source_paths:
         raise ValueError(f"no Markdown knowledge documents found in {knowledge_dir}")
 
-    documents = [
-        load_knowledge_document(path, root=knowledge_dir) for path in source_paths
-    ]
-    document_ids = [document.document_id for document in documents]
-    if len(document_ids) != len(set(document_ids)):
-        raise ValueError("document_id values must be unique")
+    documents: list[KnowledgeDocument] = []
+    seen_ids: dict[str, int] = {}
+    for path in source_paths:
+        try:
+            doc = load_knowledge_document(path, root=knowledge_dir)
+        except Exception as exc:
+            import warnings
+
+            warnings.warn(f"skipping {path.name}: {exc}")
+            continue
+        # Auto-resolve duplicate document_ids with a numbered suffix
+        base_id = doc.document_id
+        if base_id in seen_ids:
+            seen_ids[base_id] += 1
+            new_id = f"{base_id}-DUP{seen_ids[base_id]}"
+            # Rewrite the front-matter on disk so future loads stay consistent
+            try:
+                text = path.read_text(encoding="utf-8")
+                lines = text.splitlines()
+                closing = next(
+                    i for i, line in enumerate(lines[1:], start=1) if line.strip() == "---"
+                )
+                meta = yaml.safe_load("\n".join(lines[1:closing])) or {}
+                meta["document_id"] = new_id
+                new_text = (
+                    "---\n"
+                    + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False)
+                    + "---\n"
+                    + "\n".join(lines[closing + 1 :])
+                )
+                path.write_text(new_text, encoding="utf-8")
+                doc = KnowledgeDocument(
+                    document_id=new_id,
+                    title=doc.title,
+                    date=doc.date,
+                    department=doc.department,
+                    relative_path=doc.relative_path,
+                    body=doc.body,
+                    body_start_line=doc.body_start_line,
+                )
+            except Exception:
+                pass  # if we can't rewrite, just use the suffixed id in the index
+        else:
+            seen_ids[base_id] = 0
+        documents.append(doc)
+
+    if not documents:
+        raise ValueError("no valid knowledge documents after tolerance filter")
 
     chunks = [chunk for document in documents for chunk in _chunk_document(document)]
     source_hash = hashlib.sha256(

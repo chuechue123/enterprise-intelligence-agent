@@ -16,20 +16,23 @@
   const popoverClose = document.getElementById("popoverClose");
   const health = document.getElementById("knowledgeHealth");
   const healthPill = document.getElementById("knowledgeHealthPill");
+  const uploadBtn = document.getElementById("uploadBtn");
+  const fileInput = document.getElementById("fileInput");
   let currentPage = 1;
   let pageCount = 1;
   let requestSerial = 0;
   let searchHandle = null;
 
-  const badgeKinds = {
-    "产品文档": ["W", "word"],
-    "制度文档": ["P", "pdf"],
-    "经营计划": ["X", "sheet"],
-    "技术文档": ["P", "pdf"],
-    "客户资料": ["W", "word"],
-    "行业研究": ["P", "pdf"],
-    "内部资料": ["M", "markdown"]
+  const extKinds = {
+    ".md": ["M", "markdown"],
+    ".markdown": ["M", "markdown"],
   };
+
+  function badgeForPath(sourcePath) {
+    const ext = (sourcePath || "").split(".").pop();
+    const key = ext ? "." + ext.toLowerCase() : ".md";
+    return extKinds[key] || ["M", "markdown"];
+  }
 
   function setLoading() {
     state.hidden = true;
@@ -52,11 +55,41 @@
 
   function documentRow(item) {
     const row = document.createElement("tr");
-    const [letter, kind] = badgeKinds[item.document_type] || badgeKinds["内部资料"];
+    const [letter, kind] = badgeForPath(item.source_path);
     const nameCell = document.createElement("td");
     nameCell.innerHTML = `<span class="file-badge ${kind}" aria-hidden="true">${letter}</span>`;
-    const title = document.createElement("strong");
+    const title = document.createElement("button");
+    title.type = "button";
+    title.className = "document-title-link";
     title.textContent = item.title;
+    title.title = "点击下载";
+    title.addEventListener("click", async () => {
+      const url = `/bizinsight/knowledge/documents/${encodeURIComponent(item.document_id)}/download`;
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error("下载失败");
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        // 优先使用后端 Content-Disposition 里的真实文件名
+        const cd = resp.headers.get("Content-Disposition") || "";
+        const match = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
+        let fname = match ? match[1].replace(/['"]/g, "") : "";
+        if (!fname) {
+          const dotIdx = item.source_path.lastIndexOf(".");
+          const ext = dotIdx >= 0 ? item.source_path.substring(dotIdx) : ".md";
+          fname = item.title + ext;
+        }
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        alert(err.message || "下载失败，请重启服务后重试");
+      }
+    });
     nameCell.appendChild(title);
 
     const typeCell = document.createElement("td");
@@ -74,6 +107,8 @@
 
     const actionCell = document.createElement("td");
     actionCell.className = "document-action";
+
+    // Row-menu (info) button
     const action = document.createElement("button");
     action.type = "button";
     action.className = "row-menu";
@@ -81,6 +116,33 @@
     action.textContent = "•••";
     action.addEventListener("click", (event) => showIndexInfo(item, event.currentTarget));
     actionCell.appendChild(action);
+
+    // Delete button
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "row-delete";
+    del.setAttribute("aria-label", `删除 ${item.title}`);
+    del.title = "删除文档（同步重建检索索引）";
+    del.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V4.5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2V6m3 0v13.5a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6" /><path d="M10 11v6M14 11v6" /></svg>`;
+    del.addEventListener("click", async () => {
+      const ok = confirm(`确定删除「${item.title}」吗？\n\n删除后会自动重建 BM25 + 向量索引，该文档将不再参与 Agent 的知识库检索。此操作不可撤销。`);
+      if (!ok) return;
+      del.disabled = true;
+      del.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" class="spin"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42" stroke-dashoffset="14"/></svg>`;
+      try {
+        const resp = await fetch(`/bizinsight/knowledge/documents/${encodeURIComponent(item.document_id)}`, {
+          method: "DELETE",
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.detail || `删除失败 (${resp.status})`);
+        await loadDocuments(currentPage);
+      } catch (err) {
+        alert(err.message || "删除失败");
+        del.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V4.5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2V6m3 0v13.5a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6" /><path d="M10 11v6M14 11v6" /></svg>`;
+        del.disabled = false;
+      }
+    });
+    actionCell.appendChild(del);
 
     row.append(nameCell, typeCell, statusCell, dateCell, actionCell);
     return row;
@@ -174,6 +236,49 @@
   popoverClose.addEventListener("click", () => { popover.hidden = true; });
   document.addEventListener("pointerdown", (event) => {
     if (!popover.hidden && !popover.contains(event.target) && !event.target.closest(".row-menu")) popover.hidden = true;
+  });
+
+  // Upload button logic
+  uploadBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" class="spin"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42" stroke-dashoffset="14"/></svg> 上传并重建索引中...`;
+    try {
+      const resp = await fetch("/bizinsight/knowledge/documents/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        throw new Error(body.detail || `上传失败 (${resp.status})`);
+      }
+      await loadDocuments(1);
+      const v = body.vector_status;
+      let okText;
+      if (v === "ok") {
+        okText = `上传成功 · BM25 + 向量重建完成 ✓`;
+      } else if (v === "skipped") {
+        okText = `上传成功 · BM25 已重建，向量重建未启用（未配置 API Key）`;
+      } else if (v === "degraded") {
+        okText = `上传成功 · BM25 已重建，向量重建跳过（${body.vector_error || "未知错误"}）`;
+      } else {
+        okText = `上传成功 ✓`;
+      }
+      uploadBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 18v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg> ${okText}`;
+      setTimeout(() => {
+        uploadBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 18v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg> 上传文件`;
+      }, 3500);
+    } catch (err) {
+      alert(err.message || "上传失败");
+      uploadBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 18v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg> 上传文件`;
+    } finally {
+      uploadBtn.disabled = false;
+      fileInput.value = "";
+    }
   });
 
   loadDocuments();

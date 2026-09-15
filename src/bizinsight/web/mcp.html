@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>MCP 控制中心 · BizInsight Agent</title>
+  <link rel="stylesheet" href="/bizinsight/assets/styles.css?v=20260915-mcp5" />
+</head>
+
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="BizInsight Agent 首页">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-name">BizInsight Agent</span>
+    </a>
+    <div class="online-pill" id="globalStatus"><span class="status-dot"></span><span>读取运行状态</span></div>
+    <span class="top-divider"></span>
+    <span class="product-note">AgentScope MCP 控制中心</span>
+  </header>
+
+  <div class="app-shell plain">
+    <nav class="sidebar" aria-label="主导航">
+      <a class="nav-item" href="/">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5" />
+        </svg>
+        <span>分析工作台</span>
+      </a>
+      <a class="nav-item active" href="/bizinsight/mcp" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 4h16v5H4zM4 15h16v5H4zM9 9.5h6v5H9z" />
+        </svg>
+        <span>MCP 工具</span>
+      </a>
+      <a class="nav-item" href="/knowledge">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M4.5 5.5A3.5 3.5 0 0 1 8 2h4v17H8a3.5 3.5 0 0 0-3.5 3zM19.5 5.5A3.5 3.5 0 0 0 16 2h-4v17h4a3.5 3.5 0 0 1 3.5 3z" />
+        </svg>
+        <span>知识库 / RAG</span>
+      </a>
+      <section class="sidebar-foot">
+        <span class="shield-mini" aria-hidden="true"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M899.644952 166.424381L350.854095 705.987048 125.232762 495.079619c-68.303238-63.853714-171.166476 38.607238-102.64381 102.64381l278.235429 260.096c29.062095 27.172571 73.74019 28.42819 102.643809 0l598.820572-588.739048c66.840381-65.706667-35.876571-168.313905-102.64381-102.656z"
+              fill="currentColor"></path>
+          </svg></span>
+        <p>只读数据访问<br />证据链路可追溯</p>
+      </section>
+    </nav>
+
+    <main class="workspace mcp-workspace">
+      <section class="card ask-card" aria-labelledby="mcpTitle">
+        <div class="section-heading">
+          <span class="heading-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 4h16v5H4zM4 15h16v5H4zM9 9.5h6v5H9z" />
+            </svg>
+          </span>
+          <div>
+            <h1 id="mcpTitle">MCP工具</h1>
+            <p>统一管理外部工具接入、授权与运行状态</p>
+          </div>
+          <button type="button" class="btn-primary" id="addServerBtn">
+            <span aria-hidden="true">＋</span> 添加 MCP Server
+          </button>
+        </div>
+
+        <div class="mcp-session-notice" id="sessionNotice" role="status" hidden>
+          <strong>配置已保存</strong>
+          <span id="sessionNoticeText">请在分析工作台新建会话，让新的 Toolkit 生效。</span>
+          <a href="/">前往工作台</a>
+        </div>
+
+        <section class="mcp-panel" aria-labelledby="wiringTitle">
+          <div class="mcp-section-head">
+            <div>
+              <h2 id="wiringTitle">AgentScope 接线图</h2>
+            </div>
+            <p>授权关系决定新会话中每个 Toolkit 能看到哪些工具。</p>
+          </div>
+          <div class="mcp-wiring" id="wiringMap" aria-live="polite"></div>
+        </section>
+
+        <section class="mcp-panel" aria-labelledby="serverTitle">
+          <div class="mcp-section-head">
+            <div>
+              <h2 id="serverTitle">服务器与工具</h2>
+            </div>
+            <button type="button" class="mcp-refresh" id="refreshBtn">刷新状态</button>
+          </div>
+          <div class="mcp-server-list" id="mcpList" aria-live="polite"></div>
+          <div class="mcp-loading" id="mcpEmpty">正在读取 MCP 注册表…</div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog class="mcp-dialog" id="addServerDialog" aria-labelledby="addDialogTitle">
+    <form id="addServerForm" novalidate>
+      <header>
+        <div>
+          <h2 id="addDialogTitle">添加 MCP Server</h2>
+        </div>
+        <button type="button" class="mcp-dialog-close" id="cancelAddBtn" aria-label="关闭">×</button>
+      </header>
+
+      <ol class="mcp-steps" aria-label="添加步骤">
+        <li class="active"><span>1</span>配置连接</li>
+        <li><span>2</span>探测工具</li>
+        <li><span>3</span>保存并授权</li>
+      </ol>
+
+      <div class="mcp-form-grid">
+        <label><span>唯一名称 <em>*</em></span><input name="name" required maxlength="48" pattern="[A-Za-z0-9_-]+"
+            placeholder="filesystem" /><small>仅字母、数字、下划线和短横线</small></label>
+        <label><span>显示名称</span><input name="display_name" maxlength="80" placeholder="文件系统工具" /></label>
+        <label class="wide"><span>用途说明</span><textarea name="description" maxlength="400" rows="2"
+            placeholder="这个 Server 为 Agent 提供什么能力？"></textarea></label>
+        <label><span>传输方式</span><select name="transport" id="transportSelect">
+            <option value="stdio">stdio · 本地进程</option>
+            <option value="streamable_http">Streamable HTTP</option>
+            <option value="sse">SSE</option>
+          </select></label>
+        <label><span>凭据环境变量</span><input name="api_key_env" maxlength="100"
+            placeholder="可选，如 MCP_API_KEY" /><small>只保存变量名，不保存密钥值</small></label>
+        <label class="wide stdio-field"><span>执行命令 <em>*</em></span><input name="command" maxlength="500"
+            placeholder="npx 或 python" /></label>
+        <label class="wide stdio-field"><span>参数（每行一个）</span><textarea name="args" rows="4"
+            placeholder="-y&#10;@modelcontextprotocol/server-filesystem&#10;G:\共享资料"></textarea><small>命令与参数分开执行，不经过
+            shell</small></label>
+        <label class="wide http-field" hidden><span>服务地址 <em>*</em></span><input name="url" maxlength="2000"
+            placeholder="https://example.com/mcp" /></label>
+      </div>
+
+      <fieldset class="mcp-targets">
+        <legend>授权给哪些 Agent <em>*</em></legend>
+        <label><input type="checkbox" name="targets" value="BizInsightSupervisor"
+            checked /><span><strong>Supervisor</strong><small>通用问答与协调</small></span></label>
+        <label><input type="checkbox" name="targets" value="FinanceSalesAgent" /><span><strong>财务与销售</strong><small>经营分析
+              Worker</small></span></label>
+        <label><input type="checkbox" name="targets"
+            value="CustomerProductAgent" /><span><strong>客户与产品</strong><small>经营分析 Worker</small></span></label>
+        <label><input type="checkbox" name="targets" value="DeliveryAgent" /><span><strong>项目交付</strong><small>经营分析
+              Worker</small></span></label>
+      </fieldset>
+
+      <div class="mcp-probe-result" id="probeResult" hidden></div>
+      <p class="mcp-form-error" id="formError" role="alert" hidden></p>
+      <footer>
+        <span class="mcp-save-hint" id="saveHint">请先测试连接，成功后即可保存</span>
+        <div class="mcp-dialog-actions">
+          <button type="button" class="btn-ghost" id="probeBtn">测试连接并发现工具</button>
+          <button type="submit" class="btn-primary" id="saveBtn" disabled>保存并添加</button>
+        </div>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="mcp-toast" id="toast" role="status" hidden></div>
+  <script src="/bizinsight/assets/mcp.js?v=20260915-mcp" defer></script>
+</body>
+
+</html>

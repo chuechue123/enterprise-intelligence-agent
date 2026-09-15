@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="light" />
   <title>BizInsight Agent · 企业经营分析工作台</title>
-  <link rel="stylesheet" href="/bizinsight/assets/styles.css" />
+  <link rel="stylesheet" href="/bizinsight/assets/styles.css?v=20260914-15" />
 </head>
 
 <body>
@@ -20,7 +20,7 @@
     <span class="product-note">企业经营异常诊断智能体</span>
   </header>
 
-  <div class="app-shell">
+  <div class="app-shell analysis-shell">
     <nav class="sidebar" aria-label="主导航">
       <a class="nav-item active" href="/" aria-current="page">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -28,12 +28,12 @@
         </svg>
         <span>分析工作台</span>
       </a>
-      <button class="nav-item" type="button" data-scroll="reportPanel">
+      <a class="nav-item" href="/bizinsight/mcp">
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 15.5h6" />
+          <path d="M4 4h16v5H4zM4 15h16v5H4zM9 9.5h6v5H9z" />
         </svg>
-        <span>报告预览</span>
-      </button>
+        <span>MCP 工具</span>
+      </a>
       <a class="nav-item" href="/knowledge">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
@@ -41,6 +41,17 @@
         </svg>
         <span>知识库 / RAG</span>
       </a>
+      <section class="conversation-history" aria-labelledby="historyTitle">
+        <div class="conversation-history-head">
+          <h2 id="historyTitle">历史会话</h2>
+          <button class="new-conversation" id="newConversation" type="button" aria-label="新建会话" title="新建会话">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+        </div>
+        <div class="conversation-history-list" id="conversationHistoryList" aria-label="历史会话列表"></div>
+      </section>
       <div class="sidebar-foot">
         <span class="shield-mini"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
             <path
@@ -54,7 +65,7 @@
     <main class="workspace">
       <section class="card ask-card" aria-labelledby="askTitle">
         <div class="section-heading">
-          <span class="heading-icon chat-icon" aria-hidden="true">
+          <span class="heading-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
               <path d="M5 5h14v10H9l-4 4zM9 9h6M9 12h4" />
             </svg>
@@ -291,7 +302,7 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-  <script src="/bizinsight/assets/app.js" defer></script>
+  <script src="/bizinsight/assets/app.js?v=20260914-13" defer></script>
 </body>
 
 </html>
